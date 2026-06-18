@@ -89,10 +89,10 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDrLO5Y4untHFecD6iCPoJv5
 
 def _translate_gemini(text: str, api_key: str, glossary_info: str = "") -> str:
     """
-    Translate Vietnamese text to English using Gemini 1.5 Flash REST API.
+    Translate Vietnamese text to English using Gemini 2.0 Flash REST API.
     Provides formal, accurate translations guided by specialized glossaries.
     """
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
     
     prompt = (
         "You are an expert consular and legal translator specializing in Vietnamese-to-English translations.\n"
@@ -215,7 +215,7 @@ def translate_document(
     logger.info(f"Using document type: {doc_type} ({doc_type_label})")
 
     # Route specialized templates
-    if doc_type in ["birth_cert", "marriage_cert", "land_use_right"]:
+    if doc_type in ["birth_cert", "marriage_cert"]:
         from .template_translator import get_template_blocks
         template_blocks = get_template_blocks(doc_type, full_text, deepl_api_key)
         if template_blocks:
