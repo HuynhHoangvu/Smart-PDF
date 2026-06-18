@@ -214,16 +214,16 @@ def translate_document(
     doc_type_label = get_doc_type_label(doc_type)
     logger.info(f"Using document type: {doc_type} ({doc_type_label})")
 
-    # Route specialized templates (disabled to enforce dynamic Gemini translations with correct form matching)
-    if False:
-        from .template_translator import get_template_blocks
-        template_blocks = get_template_blocks(doc_type, full_text, deepl_api_key)
+    # Use Gemini-powered template translator for birth certificate to ensure correct layout and perfect translation
+    if doc_type == "birth_cert":
+        from .template_translator import get_gemini_birth_cert_blocks
+        template_blocks = get_gemini_birth_cert_blocks(full_text, GEMINI_API_KEY)
         if template_blocks:
             return {
                 "doc_type":       doc_type,
                 "doc_type_label": doc_type_label,
                 "total_pages":    1,
-                "translator":     "deepl" if deepl_api_key else "google",
+                "translator":     "gemini",
                 "pages": [
                     {
                         "page_num": 1,

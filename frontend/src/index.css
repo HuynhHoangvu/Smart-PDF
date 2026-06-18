@@ -977,3 +977,20 @@ a {
   border-top: 1px solid #e2e8f0;
   flex-shrink: 0;
 }
+
+/* Constrain react-pdf pages to prevent layout/ResizeObserver zoom loops */
+.react-pdf__Document {
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.react-pdf__Page {
+  max-width: 100% !important;
+  height: auto !important;
+}
+.react-pdf__Page canvas {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
