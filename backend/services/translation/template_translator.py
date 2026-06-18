@@ -352,7 +352,7 @@ def get_gemini_birth_cert_blocks(full_text: str, api_key: str) -> list:
     import logging
     
     logger = logging.getLogger(__name__)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
     
     prompt = (
         "You are an expert consular translator. Analyze the following Vietnamese Birth Certificate text and extract all details in English.\n"
@@ -391,17 +391,18 @@ def get_gemini_birth_cert_blocks(full_text: str, api_key: str) -> list:
         f"Vietnamese Birth Certificate text:\n\"\"\"\n{full_text}\n\"\"\"\n"
     )
     
+    # NOTE: Do NOT use responseMimeType: "application/json" — it causes HTTP 404 with this API key.
+    # Instead, ask Gemini to return JSON via prompt instruction, then extract manually.
     payload = {
         "contents": [
             {
                 "parts": [
-                    {"text": prompt}
+                    {"text": prompt + "\n\nIMPORTANT: Respond with ONLY a valid JSON object. No markdown fences, no explanation."}
                 ]
             }
         ],
         "generationConfig": {
-            "temperature": 0.1,
-            "responseMimeType": "application/json"
+            "temperature": 0.1
         }
     }
     
@@ -412,31 +413,59 @@ def get_gemini_birth_cert_blocks(full_text: str, api_key: str) -> list:
             headers={"Content-Type": "application/json"},
             method="POST"
         )
-        with urllib.request.urlopen(req, timeout=20) as response:
+        with urllib.request.urlopen(req, timeout=25) as response:
             res_data = json.loads(response.read().decode("utf-8"))
             response_text = res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            
+            # Strip markdown code fences if present (```json ... ```)
+            if response_text.startswith("```"):
+                response_text = re.sub(r"^```(?:json)?\s*", "", response_text)
+                response_text = re.sub(r"\s*```$", "", response_text)
+            response_text = response_text.strip()
+            
             data = json.loads(response_text)
+            logger.info(f"Gemini birth cert extraction succeeded: name={data.get('full_name')} dob={data.get('dob')}")
             
             is_copy = data.get("is_copy", False)
             cert_type = "COPY" if is_copy else "ORIGINAL"
             
             blocks = [
                 {"type": "paragraph", "translated": "SOCIALIST REPUBLIC OF VIETNAM\nIndependence - Freedom - Happiness", "align": "center", "is_heading": False, "is_bold": True},
-                {"type": "paragraph", "translated": f"BIRTH CERTIFICATE\n({cert_type})\tNo. {data.get('no', '')}\nBook No.: {data.get('book_no', '')}", "align": "center", "is_heading": True, "is_bold": True},
+                {"type": "paragraph", "translated": f"BIRTH CERTIFICATE\n({cert_type})    No. {data.get('no', '')}\nBook No.: {data.get('book_no', '')}", "align": "center", "is_heading": True, "is_bold": True},
                 
-                {"type": "paragraph", "translated": f"Full name: {data.get('full_name', '')}\t\tGender: {data.get('gender', '')}", "align": "left", "is_heading": False, "is_bold": False},
+                {
+                    "type": "table",
+                    "borderless": True,
+                    "original_cells": [["Họ, chữ đệm, tên:", "Giới tính:"]],
+                    "translated_cells": [[f"Full name: {data.get('full_name', '')}", f"Gender: {data.get('gender', '')}"]]
+                },
                 {"type": "paragraph", "translated": f"Date of birth: {data.get('dob', '')}", "align": "left", "is_heading": False, "is_bold": False},
                 {"type": "paragraph", "translated": f"In words: {data.get('dob_in_words', '')}", "align": "left", "is_heading": False, "is_bold": False},
                 {"type": "paragraph", "translated": f"Place of birth: {data.get('pob', '')}", "align": "left", "is_heading": False, "is_bold": False},
-                {"type": "paragraph", "translated": f"Ethnic group: {data.get('ethnic', '')}\t\t\t\tNationality: {data.get('nationality', '')}", "align": "left", "is_heading": False, "is_bold": False},
+                {
+                    "type": "table",
+                    "borderless": True,
+                    "original_cells": [["Dân tộc:", "Quốc tịch:"]],
+                    "translated_cells": [[f"Ethnic group: {data.get('ethnic', '')}", f"Nationality: {data.get('nationality', '')}"]]
+                },
                 
                 {"type": "paragraph", "translated": "PARENTS' DETAILS", "align": "left", "is_heading": True, "is_bold": True},
-                {"type": "paragraph", "translated": f"Father’s full name: {data.get('father_name', '')}", "align": "left", "is_heading": False, "is_bold": False},
-                {"type": "paragraph", "translated": f"Ethnic group: {data.get('father_ethnic', '')}\tNationality: {data.get('father_nationality', '')}\tYear of birth: {data.get('father_yob', '')}", "align": "left", "is_heading": False, "is_bold": False},
+                {"type": "paragraph", "translated": f"Father's full name: {data.get('father_name', '')}", "align": "left", "is_heading": False, "is_bold": False},
+                {
+                    "type": "table",
+                    "borderless": True,
+                    "original_cells": [["Dân tộc:", "Quốc tịch:", "Năm sinh:"]],
+                    "translated_cells": [[f"Ethnic group: {data.get('father_ethnic', '')}", f"Nationality: {data.get('father_nationality', '')}", f"Year of birth: {data.get('father_yob', '')}"]]
+                },
                 {"type": "paragraph", "translated": f"Permanent residence: {data.get('father_residence', '')}", "align": "left", "is_heading": False, "is_bold": False},
                 
-                {"type": "paragraph", "translated": f"Mother’s full name: {data.get('mother_name', '')}", "align": "left", "is_heading": False, "is_bold": False},
-                {"type": "paragraph", "translated": f"Ethnic group: {data.get('mother_ethnic', '')}\tNationality: {data.get('mother_nationality', '')}\tYear of birth: {data.get('mother_yob', '')}", "align": "left", "is_heading": False, "is_bold": False},
+                {"type": "paragraph", "translated": f"Mother's full name: {data.get('mother_name', '')}", "align": "left", "is_heading": False, "is_bold": False},
+                {
+                    "type": "table",
+                    "borderless": True,
+                    "original_cells": [["Dân tộc:", "Quốc tịch:", "Năm sinh:"]],
+                    "translated_cells": [[f"Ethnic group: {data.get('mother_ethnic', '')}", f"Nationality: {data.get('mother_nationality', '')}", f"Year of birth: {data.get('mother_yob', '')}"]]
+                },
                 {"type": "paragraph", "translated": f"Permanent residence: {data.get('mother_residence', '')}", "align": "left", "is_heading": False, "is_bold": False},
                 
                 {"type": "paragraph", "translated": f"Place of registration: {data.get('place_of_registration', '')}", "align": "left", "is_heading": False, "is_bold": False},
@@ -445,10 +474,17 @@ def get_gemini_birth_cert_blocks(full_text: str, api_key: str) -> list:
                 {"type": "paragraph", "translated": f"Full name of birth declarer: {data.get('declarer', '')}", "align": "left", "is_heading": False, "is_bold": False},
                 {"type": "paragraph", "translated": f"Relation with the declared person: {data.get('relation', '')}", "align": "left", "is_heading": False, "is_bold": False},
                 
-                {"type": "paragraph", "translated": f"REGISTRAR\n\n(Signed and wrote full name)\n{data.get('registrar', '')}\t\tSIGNER OF BIRTH CERTIFICATE\n{data.get('signer_title', 'CHAIRMAN')}\n(Signed, wrote full name and sealed)\n{data.get('signer', '')}", "align": "center", "is_heading": False, "is_bold": False}
+                {
+                    "type": "table",
+                    "borderless": True,
+                    "original_cells": [["NGƯỜI THỰC HIỆN ĐĂNG KÝ MẪU", "NGƯỜI KÝ GIẤY KHAI SINH"]],
+                    "translated_cells": [[
+                        f"REGISTRAR\n\n(Signed and wrote full name)\n\n{data.get('registrar', '')}",
+                        f"SIGNER OF BIRTH CERTIFICATE\n{data.get('signer_title', 'CHAIRMAN')}\n(Signed, wrote full name and sealed)\n\n{data.get('signer', '')}"
+                    ]]
+                }
             ]
             return blocks
     except Exception as e:
-        logger.warning(f"Failed to use Gemini birth certificate template: {e}")
+        logger.warning(f"Failed to use Gemini birth certificate template: {e}", exc_info=True)
         return []
-

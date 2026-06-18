@@ -92,7 +92,7 @@ def _translate_gemini(text: str, api_key: str, glossary_info: str = "") -> str:
     Translate Vietnamese text to English using Gemini 2.0 Flash REST API.
     Provides formal, accurate translations guided by specialized glossaries.
     """
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
     
     prompt = (
         "You are an expert consular and legal translator specializing in Vietnamese-to-English translations.\n"
@@ -214,65 +214,112 @@ def translate_document(
     doc_type_label = get_doc_type_label(doc_type)
     logger.info(f"Using document type: {doc_type} ({doc_type_label})")
 
-    # Use Gemini-powered template translator for birth certificate to ensure correct layout and perfect translation
-    if doc_type == "birth_cert":
-        from .template_translator import get_gemini_birth_cert_blocks
-        template_blocks = get_gemini_birth_cert_blocks(full_text, GEMINI_API_KEY)
-        if template_blocks:
-            return {
-                "doc_type":       doc_type,
-                "doc_type_label": doc_type_label,
-                "total_pages":    1,
-                "translator":     "gemini",
-                "pages": [
-                    {
-                        "page_num": 1,
-                        "width":    595,
-                        "height":   842,
-                        "blocks":   template_blocks
-                    }
-                ]
-            }
-
+    # Use page-by-page routing to translate page text with Gemini birth cert template if it's a birth certificate, or fallback to block-by-block translation.
+    from concurrent.futures import ThreadPoolExecutor
+    
+    tasks = []
+    page_templates = {}  # page_idx -> template_blocks
+    
     # 2. Load glossary
     glossary = get_glossary_for_type(doc_type)
 
     # 3. Resolve which translator was actually used
     translator_name = "deepl" if deepl_api_key else "google"
 
-    # 4. Translate each block
+    for page_idx, page in enumerate(structured_data.get("pages", [])):
+        # Determine if this specific page is a birth certificate
+        page_text = "\n".join([b.get("text", "") for b in page.get("blocks", []) if b.get("type", "paragraph") != "table"])
+        
+        is_page_birth_cert = False
+        if manual_doc_type == "birth_cert":
+            is_page_birth_cert = True
+        elif manual_doc_type == "auto" or manual_doc_type is None:
+            is_page_birth_cert = detect_document_type(page_text) == "birth_cert"
+            
+        if is_page_birth_cert:
+            from .template_translator import get_gemini_birth_cert_blocks
+            logger.info(f"Page {page_idx+1} detected as birth certificate. Attempting template translation...")
+            template_blocks = get_gemini_birth_cert_blocks(page_text, GEMINI_API_KEY)
+            if template_blocks:
+                logger.info(f"Page {page_idx+1} template translation succeeded.")
+                page_templates[page_idx] = template_blocks
+                # If we used the template, we don't need block-by-block translation for this page
+                continue
+            else:
+                logger.warning(f"Page {page_idx+1} template translation failed. Falling back to block-by-block.")
+
+        # Queue this page's blocks/cells for parallel translation
+        for block_idx, block in enumerate(page.get("blocks", [])):
+            block_type = block.get("type", "paragraph")
+            if block_type == "table":
+                original_cells = block.get("cells", [])
+                for r_idx, row in enumerate(original_cells):
+                    for c_idx, cell in enumerate(row):
+                        if cell and cell.strip():
+                            tasks.append({
+                                "type": "table_cell",
+                                "page_idx": page_idx,
+                                "block_idx": block_idx,
+                                "r_idx": r_idx,
+                                "c_idx": c_idx,
+                                "text": cell.strip().replace("\n", " ")
+                            })
+            else:
+                original_text = block.get("text", "")
+                if original_text.strip():
+                    tasks.append({
+                        "type": "paragraph",
+                        "page_idx": page_idx,
+                        "block_idx": block_idx,
+                        "text": original_text
+                    })
+
+    def translate_task(task):
+        try:
+            translated = translate_block(task["text"], glossary, deepl_api_key)
+            task["translated"] = translated
+        except Exception as e:
+            logger.warning(f"Error translating task: {e}")
+            task["translated"] = task["text"]
+        return task
+
+    # Translate block-by-block tasks concurrently (max 8 workers)
+    completed_tasks = []
+    if tasks:
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            completed_tasks = list(executor.map(translate_task, tasks))
+
+    # Pre-build structured pages
     result_pages = []
-    for page in structured_data.get("pages", []):
+    for page_idx, page in enumerate(structured_data.get("pages", [])):
+        if page_idx in page_templates:
+            # Use template blocks directly
+            result_pages.append({
+                "page_num": page["page_num"],
+                "width":    page.get("width", 595),
+                "height":   page.get("height", 842),
+                "blocks":   page_templates[page_idx],
+            })
+            continue
+
         translated_blocks = []
         for block in page["blocks"]:
             block_type = block.get("type", "paragraph")
             if block_type == "table":
                 original_cells = block.get("cells", [])
-                translated_cells = []
-                for row in original_cells:
-                    translated_row = []
-                    for cell in row:
-                        if cell and cell.strip():
-                            # Clean cell text for safer translation
-                            cleaned = cell.strip().replace("\n", " ")
-                            translated_cell = translate_block(cleaned, glossary, deepl_api_key)
-                        else:
-                            translated_cell = cell
-                        translated_row.append(translated_cell)
-                    translated_cells.append(translated_row)
+                translated_cells = [list(row) for row in original_cells]
                 translated_blocks.append({
                     "type": "table",
                     "original_cells": original_cells,
                     "translated_cells": translated_cells,
+                    "borderless": block.get("borderless", False),
                     "bbox": block.get("bbox", []),
                 })
             else:
-                original_text = block.get("text", "")
-                translated_text = translate_block(original_text, glossary, deepl_api_key)
                 translated_blocks.append({
                     "type": "paragraph",
-                    "original":   original_text,
-                    "translated": translated_text,
+                    "original":   block.get("text", ""),
+                    "translated": block.get("text", ""),
                     "is_heading": block.get("is_heading", False),
                     "font_size":  block.get("font_size", 11.0),
                     "is_bold":    block.get("is_bold", False),
@@ -286,10 +333,27 @@ def translate_document(
             "blocks":   translated_blocks,
         })
 
+    # Apply translated items back to block-by-block pages
+    for task in completed_tasks:
+        p_idx = task["page_idx"]
+        b_idx = task["block_idx"]
+        translated_text = task["translated"]
+        
+        block = result_pages[p_idx]["blocks"][b_idx]
+        if task["type"] == "table_cell":
+            r_idx = task["r_idx"]
+            c_idx = task["c_idx"]
+            block["translated_cells"][r_idx][c_idx] = translated_text
+        else:
+            block["translated"] = translated_text
+
+    # Set translator_label: if templates were used, mention it
+    final_translator = "gemini" if page_templates else translator_name
+
     return {
         "doc_type":       doc_type,
         "doc_type_label": doc_type_label,
         "total_pages":    structured_data.get("total_pages", 0),
-        "translator":     translator_name,
+        "translator":     final_translator,
         "pages":          result_pages,
     }

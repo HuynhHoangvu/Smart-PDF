@@ -183,29 +183,26 @@ const TranslateWorkspace = () => {
 
     let currentProgress = 0;
     const interval = setInterval(() => {
-      if (currentProgress < 30) {
-        currentProgress += Math.floor(Math.random() * 5) + 3;
-      } else if (currentProgress < 75) {
-        currentProgress += Math.floor(Math.random() * 3) + 1;
-      } else if (currentProgress < 98) {
-        currentProgress += 1;
-      }
+      // Smooth asymptotic growth towards 99%
+      const remaining = 99 - currentProgress;
+      const increment = Math.max(0.1, remaining * 0.04);
+      currentProgress = Math.min(99, currentProgress + increment);
       
-      if (currentProgress > 98) currentProgress = 98;
-      setProgress(currentProgress);
-
-      if (currentProgress < 20) {
+      const displayProgress = Math.floor(currentProgress);
+      setProgress(displayProgress);
+ 
+      if (displayProgress < 25) {
         setLoadingStep('Đang đọc cấu trúc file PDF...');
-      } else if (currentProgress < 45) {
+      } else if (displayProgress < 50) {
         setLoadingStep('Đang phân tích bảng biểu và căn lề tự động...');
-      } else if (currentProgress < 70) {
+      } else if (displayProgress < 75) {
         setLoadingStep('Đang đối chiếu biểu mẫu dịch chuyên dụng...');
-      } else if (currentProgress < 90) {
+      } else if (displayProgress < 90) {
         setLoadingStep('Đang áp dụng từ điển thuật ngữ Lãnh sự...');
       } else {
         setLoadingStep('Đang hoàn thiện bố cục và đóng gói file Word...');
       }
-    }, 150);
+    }, 250);
 
     try {
       const formData = new FormData();
@@ -446,7 +443,7 @@ const TranslateWorkspace = () => {
               <Page
                 pageNumber={currentPage}
                 scale={pdfScale}
-                width={containerWidth}
+                width={Math.min(595, containerWidth)}
                 renderTextLayer={false}
                 renderAnnotationLayer={false}
               />

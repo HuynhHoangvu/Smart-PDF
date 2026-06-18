@@ -936,18 +936,25 @@ a {
 }
 .translate-panel-scroll {
   flex: 1;
-  overflow-y: auto;
+  overflow: auto;
   padding: 20px;
   display: flex;
   justify-content: center;
+  align-items: flex-start;
 }
 .translate-panel-left { background: #edf2f7; }
-.translate-panel-right { background: white; }
+.translate-panel-right { background: #edf2f7; }
 
 /* Translated content */
 .translated-page-content {
-  max-width: 580px;
-  width: 100%;
+  background: white;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  border: 1px solid #cbd5e0;
+  padding: 40px;
+  width: 595px;
+  min-height: 842px;
+  margin: 10px auto;
+  box-sizing: border-box;
 }
 .translated-block {
   margin-bottom: 12px;
