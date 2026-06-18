@@ -161,6 +161,20 @@ const TranslateWorkspace = () => {
   const [loadingStep, setLoadingStep] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('auto');
 
+  const containerRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(480);
+
+  React.useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      if (entries[0]) {
+        setContainerWidth(Math.floor(entries[0].contentRect.width - 32));
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [file, status]);
+
   const fetchTranslation = async (f, temp) => {
     setStatus('loading');
     setErrorMsg('');
@@ -424,7 +438,7 @@ const TranslateWorkspace = () => {
           <div className="translate-panel-header">
             <FileText size={14} /> Bản gốc (Tiếng Việt)
           </div>
-          <div className="translate-panel-scroll">
+          <div className="translate-panel-scroll" ref={containerRef}>
             <Document
               file={objectUrl}
               onLoadSuccess={({ numPages }) => setPdfNumPages(numPages)}
@@ -432,6 +446,7 @@ const TranslateWorkspace = () => {
               <Page
                 pageNumber={currentPage}
                 scale={pdfScale}
+                width={containerWidth}
                 renderTextLayer={false}
                 renderAnnotationLayer={false}
               />

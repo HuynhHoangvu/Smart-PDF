@@ -214,8 +214,8 @@ def translate_document(
     doc_type_label = get_doc_type_label(doc_type)
     logger.info(f"Using document type: {doc_type} ({doc_type_label})")
 
-    # Route specialized templates
-    if doc_type in ["birth_cert", "marriage_cert"]:
+    # Route specialized templates (disabled to enforce dynamic Gemini translations with correct form matching)
+    if False:
         from .template_translator import get_template_blocks
         template_blocks = get_template_blocks(doc_type, full_text, deepl_api_key)
         if template_blocks:
