@@ -344,6 +344,63 @@ async def api_pdf_to_word_download_edited(request: DownloadEditedWordRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ── Split PDF ─────────────────────────────────────────────────────────────────
+@app.post("/api/split")
+async def api_split(
+    file: UploadFile = File(...),
+    ranges: str = Form(...),  # e.g. "1-3,4,5-7" or "1,2,3"
+):
+    """
+    Split a PDF by page ranges. ranges = comma-separated items like "1-3,4,5-7".
+    Returns a ZIP containing one PDF per range.
+    """
+    try:
+        import fitz, zipfile
+        content = await file.read()
+        doc = fitz.open(stream=content, filetype="pdf")
+        total = doc.page_count
+
+        # Parse ranges
+        segments = []
+        for part in ranges.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            if "-" in part:
+                a, b = part.split("-", 1)
+                start, end = int(a.strip()) - 1, int(b.strip()) - 1
+            else:
+                start = end = int(part) - 1
+            start = max(0, min(start, total - 1))
+            end   = max(0, min(end,   total - 1))
+            segments.append((start, end))
+
+        if not segments:
+            raise HTTPException(status_code=400, detail="Không có range hợp lệ")
+
+        base = (file.filename or "document").rsplit(".", 1)[0]
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for i, (s, e) in enumerate(segments, 1):
+                new_doc = fitz.open()
+                new_doc.insert_pdf(doc, from_page=s, to_page=e)
+                pdf_bytes = new_doc.tobytes()
+                new_doc.close()
+                label = f"trang_{s+1}" if s == e else f"trang_{s+1}-{e+1}"
+                zf.writestr(f"{base}_{label}.pdf", pdf_bytes)
+        doc.close()
+        zip_buf.seek(0)
+        return StreamingResponse(
+            zip_buf,
+            media_type="application/zip",
+            headers={"Content-Disposition": make_safe_filename_header(f"{base}_split.zip")},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ── PDF → Images ──────────────────────────────────────────────────────────────
 @app.post("/api/pdf-to-images")
 async def api_pdf_to_images(

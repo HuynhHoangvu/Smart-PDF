@@ -7,6 +7,7 @@ import PdfToWordWorkspace from '../components/PdfToWordWorkspace';
 import PdfToImageWorkspace from '../components/PdfToImageWorkspace';
 import WordToPdfWorkspace from '../components/WordToPdfWorkspace';
 import ImageConvertWorkspace from '../components/ImageConvertWorkspace';
+import SplitWorkspace from '../components/SplitWorkspace';
 import TranslateWorkspace from '../components/TranslateWorkspace';
 import CompressWorkspace from '../components/CompressWorkspace';
 
@@ -99,6 +100,8 @@ const config = toolConfig[toolId] || { title: 'Công cụ', formats: ['PDF'] };
         </div>
       ) : toolId === 'merge' ? (
         <MergeWorkspace initialFiles={files} onCancel={() => setFiles([])} />
+      ) : toolId === 'split' ? (
+        <SplitWorkspace initialFiles={files} onCancel={() => setFiles([])} />
       ) : toolId === 'compress' ? (
         <CompressWorkspace initialFiles={files} onCancel={() => setFiles([])} />
       ) : toolId === 'pdf-to-word' ? (
