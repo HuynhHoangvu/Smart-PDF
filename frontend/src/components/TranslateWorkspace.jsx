@@ -537,66 +537,64 @@ const TranslateWorkspace = () => {
       </div>
 
       <div className="translate-panels">
-        <div className="translate-dual-pages-scroll" ref={containerRef}>
-          <Document file={objectUrl} onLoadSuccess={({ numPages }) => setPdfNumPages(numPages)}>
-            <div className="translate-dual-pages-grid">
-              {Array.from({ length: pdfNumPages || 0 }, (_, idx) => {
-                const pageNumber = idx + 1;
-                const translatedPage = result.pages?.find((p) => p.page_num === pageNumber);
+        {/* LEFT: original pages — independent scroll */}
+        <div className="translate-panel-col translate-panel-col-left" ref={containerRef}>
+          <div className="translate-col-header">
+            <FileText size={14} /> Bản gốc (Tiếng Việt)
+          </div>
+          <div className="translate-col-scroll">
+            <Document file={objectUrl} onLoadSuccess={({ numPages }) => setPdfNumPages(numPages)}>
+              {Array.from({ length: pdfNumPages || 0 }, (_, idx) => (
+                <div key={idx + 1} className="translate-original-page-block">
+                  <div className="translate-page-label">Trang {idx + 1}</div>
+                  <Page
+                    pageNumber={idx + 1}
+                    scale={pdfScale}
+                    width={Math.min(560, containerWidth)}
+                    renderTextLayer={false}
+                    renderAnnotationLayer={false}
+                  />
+                </div>
+              ))}
+            </Document>
+          </div>
+        </div>
 
-                return (
-                  <React.Fragment key={pageNumber}>
-                    <div className="translate-panel translate-panel-left">
-                      <div className="translate-panel-header">
-                        <FileText size={14} /> Bản gốc (Tiếng Việt) · Trang {pageNumber}
-                      </div>
-                      <div className="translate-panel-scroll">
-                        <div className="translate-page-shell">
-                          <Page
-                            pageNumber={pageNumber}
-                            scale={pdfScale}
-                            width={Math.min(595, containerWidth)}
-                            renderTextLayer={false}
-                            renderAnnotationLayer={false}
-                          />
-                        </div>
-                      </div>
+        {/* RIGHT: grouped translations — independent scroll */}
+        <div className="translate-panel-col translate-panel-col-right">
+          <div className="translate-col-header">
+            <Languages size={14} /> Bản dịch (English)
+          </div>
+          <div className="translate-col-scroll">
+            {(result.pages || [])
+              .filter(p => p.is_group_lead !== false)
+              .map(page => (
+                <div key={page.page_num} className="translate-translated-block">
+                  <div className="translate-page-label">
+                    Trang {page.group_pages?.length > 1
+                      ? `${page.group_pages[0]}–${page.group_pages[page.group_pages.length - 1]}`
+                      : page.page_num}
+                  </div>
+                  {isHtmlMode ? (
+                    <HtmlTranslatedPage
+                      html={page.translated_html || ''}
+                      pageNum={page.page_num}
+                      onHtmlEdit={handleHtmlEdit}
+                      registerPageRef={registerPageRef}
+                    />
+                  ) : (
+                    <div className="translated-page-shell">
+                      <TranslatedPage
+                        pageData={page}
+                        pageNum={page.page_num}
+                        onBlockEdit={handleBlockEdit}
+                      />
                     </div>
-
-                    <div className="translate-panel translate-panel-right">
-                      <div className="translate-panel-header">
-                        <Languages size={14} /> Bản dịch (English) · Trang {pageNumber}
-                      </div>
-                      <div className="translate-panel-scroll">
-                        {translatedPage ? (
-                          isHtmlMode ? (
-                            <HtmlTranslatedPage
-                              html={translatedPage.translated_html || ''}
-                              pageNum={translatedPage.page_num}
-                              onHtmlEdit={handleHtmlEdit}
-                              registerPageRef={registerPageRef}
-                            />
-                          ) : (
-                            <div className="translated-page-shell">
-                              <TranslatedPage
-                                pageData={translatedPage}
-                                pageNum={translatedPage.page_num}
-                                onBlockEdit={handleBlockEdit}
-                              />
-                            </div>
-                          )
-                        ) : (
-                          <div className="translated-page-shell">
-                            <div className="translated-page-content">Không có nội dung cho trang này.</div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          </Document>
+                  )}
+                </div>
+              ))
+            }
+          </div>
         </div>
       </div>
 

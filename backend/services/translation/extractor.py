@@ -23,7 +23,6 @@ def is_inside_any_table(bbox: list, table_bboxes: list) -> bool:
 
 def get_alignment(block_width: float, x0: float, page_width: float, is_heading: bool = False) -> str:
     """Determine horizontal alignment based on margins and block width."""
-    block_mid = (x0 + x0 + block_width) / 2
     page_mid = page_width / 2
     margin_left = x0
     margin_right = page_width - (x0 + block_width)

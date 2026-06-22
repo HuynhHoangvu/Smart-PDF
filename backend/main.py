@@ -6,11 +6,9 @@ import io, json, os
 
 from services.pdf_merger import merge_pdfs
 from services.pdf_compressor import compress_pdf
-from services.pdf_translator import translate_text
-from services.pdf_reader import read_pdf_metadata
 from services.pdf_page_merger import merge_pages_by_manifest
 from services.pdf_to_word import convert_pdf_bytes_to_docx_bytes, parse_pdf_to_blocks, build_docx_from_blocks
-from services.translation import extract_structured, translate_document, build_docx_from_translation
+from services.translation import extract_structured, build_docx_from_translation
 from services.translation.html_extractor import pdf_to_html_pages
 from services.translation.html_translator import translate_scanned_to_html
 
@@ -95,50 +93,6 @@ async def api_compress(
         tb = traceback.format_exc()
         raise HTTPException(status_code=500, detail=tb)
 
-@app.post("/api/read")
-async def api_read(file: UploadFile = File(...)):
-    try:
-        content = await file.read()
-        info = read_pdf_metadata(content)
-        return info
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/translate")
-async def api_translate(text: str = Form(...)):
-    try:
-        translated = translate_text(text)
-        return {"translated_text": translated}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/translate-pdf")
-async def api_translate_pdf(
-    file: UploadFile = File(...),
-    doc_type: str = Form("auto")
-):
-    """
-    Translate a Vietnamese PDF to English (bilingual JSON response).
-    Uses DeepL if DEEPL_API_KEY env var is set, else falls back to Google Translate.
-    Returns structured bilingual data for frontend side-by-side rendering.
-    """
-    try:
-        content = await file.read()
-        deepl_key = os.environ.get("DEEPL_API_KEY")
-
-        # 1. Extract structured text with layout info
-        structured = extract_structured(content)
-
-        # 2. Translate all blocks (routes to template if matching specialized doc types)
-        result = translate_document(structured, deepl_api_key=deepl_key, manual_doc_type=doc_type)
-
-        # Include original filename so frontend can suggest output name
-        result["original_filename"] = file.filename or "document.pdf"
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.post("/api/translate-pdf/html")
 async def api_translate_pdf_html(
     file: UploadFile = File(...),
@@ -158,29 +112,70 @@ async def api_translate_pdf_html(
         if has_scanned:
             structured = extract_structured(content)
             for ps in structured.get("pages", []):
-                raw_text = "\n".join(
-                    b.get("text", "") for b in ps.get("blocks", [])
-                    if b.get("type") != "table" and b.get("text", "").strip()
-                )
-                structured_by_page[ps["page_num"]] = raw_text
+                parts = []
+                for b in ps.get("blocks", []):
+                    if b.get("type") == "table":
+                        # Format table rows as tab-separated so Gemini can reconstruct the table
+                        for row in b.get("rows", []):
+                            cells = [str(c).strip() for c in row if str(c).strip() not in ("", "None", "null")]
+                            if cells:
+                                parts.append(" | ".join(cells))
+                    elif b.get("text", "").strip():
+                        parts.append(b["text"])
+                structured_by_page[ps["page_num"]] = "\n".join(parts)
 
         import re as _re
         from concurrent.futures import ThreadPoolExecutor
         from services.translation.html_translator import translate_html_page
 
-        def _translate_one(page):
-            if page.get("is_scanned"):
-                raw_text = structured_by_page.get(page["page_num"], "")
-                if not raw_text.strip():
-                    raw_text = _re.sub(r"<[^>]+>", " ", page["html"]).strip()
-                translated_html = translate_scanned_to_html(raw_text)
+        # Group consecutive scanned pages in pairs so Gemini sees the complete form
+        # (e.g. page 1 = header/fields, page 2 = table → translate together as one block)
+        page_groups: list[dict] = []
+        i = 0
+        while i < len(pages):
+            p = pages[i]
+            next_p = pages[i + 1] if i + 1 < len(pages) else None
+            if p.get("is_scanned") and next_p and next_p.get("is_scanned"):
+                page_groups.append({"pages": [p, next_p], "paired": True})
+                i += 2
             else:
-                translated_html = translate_html_page(page["html"], is_scanned=False)
-            return {**page, "translated_html": translated_html}
+                page_groups.append({"pages": [p], "paired": False})
+                i += 1
 
-        # Translate all pages in parallel (up to 4 at once)
+        def _translate_group(group):
+            page_list = group["pages"]
+            if group["paired"]:
+                # Combine OCR text from both pages for a complete-form translation
+                raw1 = structured_by_page.get(page_list[0]["page_num"], "") or \
+                       _re.sub(r"<[^>]+>", " ", page_list[0]["html"]).strip()
+                raw2 = structured_by_page.get(page_list[1]["page_num"], "") or \
+                       _re.sub(r"<[^>]+>", " ", page_list[1]["html"]).strip()
+                combined = raw1 + "\n\n--- PAGE 2 (table/details section) ---\n\n" + raw2
+                translated_html = translate_scanned_to_html(combined)
+                group_pages = [p["page_num"] for p in page_list]
+                lead = {**page_list[0], "translated_html": translated_html,
+                        "group_id": page_list[0]["page_num"], "is_group_lead": True,
+                        "group_pages": group_pages}
+                follower = {**page_list[1], "translated_html": "",
+                            "group_id": page_list[0]["page_num"], "is_group_lead": False,
+                            "group_pages": group_pages}
+                return [lead, follower]
+            else:
+                p = page_list[0]
+                if p.get("is_scanned"):
+                    raw_text = structured_by_page.get(p["page_num"], "") or \
+                               _re.sub(r"<[^>]+>", " ", p["html"]).strip()
+                    translated_html = translate_scanned_to_html(raw_text)
+                else:
+                    translated_html = translate_html_page(p["html"], is_scanned=False)
+                return [{**p, "translated_html": translated_html,
+                         "group_id": p["page_num"], "is_group_lead": True,
+                         "group_pages": [p["page_num"]]}]
+
+        # Translate groups in parallel (max 4 concurrent Gemini calls)
         with ThreadPoolExecutor(max_workers=4) as ex:
-            translated_pages = list(ex.map(_translate_one, pages))
+            group_results = list(ex.map(_translate_group, page_groups))
+        translated_pages = [page for group in group_results for page in group]
 
         return {
             "original_filename": file.filename or "document.pdf",
@@ -191,38 +186,6 @@ async def api_translate_pdf_html(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/translate-pdf/download-docx")
-async def api_translate_pdf_docx(
-    file: UploadFile = File(...),
-    doc_type: str = Form("auto")
-):
-    """
-    Translate a Vietnamese PDF to English and return a formatted DOCX document directly.
-    """
-    try:
-        content = await file.read()
-        deepl_key = os.environ.get("DEEPL_API_KEY")
-
-        # 1. Extract structured text with layout info (including tables)
-        structured = extract_structured(content)
-
-        # 2. Translate all blocks (routes to template if matching specialized doc types)
-        result = translate_document(structured, deepl_api_key=deepl_key, manual_doc_type=doc_type)
-
-        # 3. Build DOCX bytes from the result blocks
-        docx_bytes = build_docx_from_translation(result)
-
-        # Format output filename: <original>_translated.docx
-        base_name = (file.filename or "document").rsplit(".", 1)[0]
-        out_filename = f"{base_name}_translated.docx"
-
-        return StreamingResponse(
-            io.BytesIO(docx_bytes),
-            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            headers={"Content-Disposition": make_safe_filename_header(out_filename)}
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 class DownloadEditedRequest(BaseModel):
     result: dict
 

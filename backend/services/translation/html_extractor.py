@@ -312,18 +312,27 @@ def pdf_to_html_pages(pdf_bytes: bytes) -> list[dict]:
     Convert all pages of a PDF to HTML.
     Returns a list of dicts:
       { "page_num": int, "html": str, "width": float, "height": float,
-        "is_scanned": bool }
+        "is_scanned": bool, "image_b64": str (only for scanned pages) }
     """
+    import base64
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pages = []
     for i, page in enumerate(doc):
         html_content, is_scanned = pdf_page_to_html(page)
-        pages.append({
+        page_dict = {
             "page_num": i + 1,
             "width": page.rect.width,
             "height": page.rect.height,
             "html": html_content,
             "is_scanned": is_scanned,
-        })
+        }
+        if is_scanned:
+            # Render high-res image for Gemini vision (3x = ~216 DPI)
+            zoom = 3.0
+            mat = fitz.Matrix(zoom, zoom)
+            pix = page.get_pixmap(matrix=mat, alpha=False)
+            img_bytes = pix.tobytes("png")
+            page_dict["image_b64"] = base64.b64encode(img_bytes).decode()
+        pages.append(page_dict)
     doc.close()
     return pages

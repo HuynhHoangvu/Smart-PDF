@@ -87,7 +87,6 @@ def parse_pdf_to_blocks(pdf_bytes: bytes) -> dict:
                     is_heading = font_size_pt >= 14
 
                     block_width = x1 - x0
-                    block_mid = (x0 + x1) / 2
                     page_mid = page_width / 2
 
                     align = "left"
@@ -157,7 +156,6 @@ def parse_pdf_to_blocks(pdf_bytes: bytes) -> dict:
 
                 x0, y0, x1, y1 = bbox
                 block_width = x1 - x0
-                block_mid = (x0 + x1) / 2
                 page_mid = page_width / 2
 
                 align = "left"

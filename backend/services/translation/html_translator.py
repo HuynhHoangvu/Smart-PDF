@@ -83,25 +83,46 @@ The document structure (birth certificate, land certificate, etc.) should guide 
 """
 
 
-def _call_gemini(model: str, api_key: str, prompt_text: str) -> str:
-    """Call a specific Gemini model and return the text response."""
+def _call_gemini(model: str, api_key: str, prompt_text: str, retries: int = 3,
+                  image_b64: str | None = None, mime_type: str = "image/png") -> str:
+    """Call a specific Gemini model and return the text response.
+    If image_b64 is provided, sends a multimodal request (vision)."""
+    import time
+    if image_b64:
+        parts = [
+            {"inline_data": {"mime_type": mime_type, "data": image_b64}},
+            {"text": prompt_text},
+        ]
+    else:
+        parts = [{"text": prompt_text}]
+
     payload = {
-        "contents": [{"parts": [{"text": prompt_text}]}],
-        "generationConfig": {"temperature": 0.05, "maxOutputTokens": 8192},
+        "contents": [{"parts": parts}],
+        "generationConfig": {"temperature": 0.05, "maxOutputTokens": 16384},
     }
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/"
         f"{model}:generateContent?key={api_key}"
     )
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
-        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    data_bytes = json.dumps(payload).encode("utf-8")
+    last_err = None
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(
+                url, data=data_bytes,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        except urllib.error.HTTPError:
+            raise  # HTTP errors (404, 400) không retry
+        except Exception as e:
+            last_err = e
+            if attempt < retries - 1:
+                time.sleep(2 ** attempt)  # 1s, 2s
+    raise last_err
 
 
 def _gemini_translate_html(html: str, api_key: str, is_scanned: bool = False) -> str:
@@ -173,27 +194,74 @@ def _fallback_translate_html(html: str) -> str:
 
 # ── Public interface ──────────────────────────────────────────────────────────
 
+VISION_PROMPT = """\
+You are an expert Vietnamese-to-English consular and legal document translator.
+You are looking at an image of a Vietnamese legal document page.
+
+Your task:
+1. Read ALL text visible in the image carefully and completely
+2. Identify the document type (birth certificate, marriage certificate, land certificate, tax payment slip, etc.)
+3. Translate EVERYTHING to formal English — ALL labels, ALL values, ALL headers, ALL text must be in English
+4. Format as a SINGLE compact HTML fragment that MUST fit on one A4 page. Rules:
+   - All text uses line-height:1; margin:0; padding:0 — no extra spacing anywhere
+   - Document title: <p style="text-align:center;margin:2px 0 0 0;line-height:0.8;"><span style="font-size:11pt;font-weight:bold;">TITLE</span></p>
+   - Header lines (SOCIALIST REPUBLIC OF VIETNAM, Independence...): <p style="text-align:center;margin:0;line-height:0.8;"><span style="font-size:8pt;font-weight:bold;">text</span></p>
+   - Subtitle (ORIGINAL/COPY): <p style="text-align:center;margin:0;line-height:0.8;"><span style="font-size:8pt;">(text)</span></p>
+   - Field label + value: <p style="margin:0;line-height:0.8;"><span style="font-size:8pt;"><b>Label:</b> value</span></p>
+   - Two fields on same line: <table style="width:100%;border:none;border-collapse:collapse;margin:0;"><tr><td style="font-size:8pt;border:none;width:50%;line-height:0.8;"><b>Label1:</b> val1</td><td style="font-size:8pt;border:none;line-height:0.8;"><b>Label2:</b> val2</td></tr></table>
+   - Signature block: right-aligned, 8pt, line-height:0.8, margin:0
+   - Do NOT bold values. Only bold labels and document title.
+   - Do NOT invent section headers not present in the original document.
+5. Consular terminology:
+   - ONLY personal names (people's names) → UPPERCASE Latin without diacritics: e.g. Nguyễn Thịnh Trọng → NGUYEN THINH TRONG
+   - All other text → normal Title Case or sentence case, NOT uppercase
+   - "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" → "SOCIALIST REPUBLIC OF VIETNAM" (ALL CAPS, bold)
+   - "Độc lập - Tự do - Hạnh phúc" → "Independence – Freedom – Happiness"
+   - "Giấy khai sinh" → "Birth Certificate", "Bản chính" → "Original", "Bản sao" → "Copy"
+   - "Họ và tên" → "Full name", "Giới tính" → "Gender", "Nam" → "Male", "Nữ" → "Female"
+   - "Ngày, tháng, năm sinh" → "Date of birth", "Nơi sinh" → "Place of birth"
+   - "Dân tộc" → "Ethnic group", "Quốc tịch" → "Nationality"
+   - "Nơi thường trú" → "Permanent residence"
+   - "Họ và tên cha" → "Father's full name", "Họ và tên mẹ" → "Mother's full name"
+   - "Ngày đăng ký" → "Date of registration", "Người đi khai sinh" → "Birth declarer"
+   - "Người thực hiện" → "Registrar", "Chủ tịch" → "Chairman", "Phó chủ tịch" → "Vice Chairman"
+   - "Giấy kết hôn" → "Marriage Certificate", "Học bạ" → "School Report"
+   - "Giấy chứng nhận quyền sử dụng đất" → "Certificate of Land Use Rights"
+   - "Giấy nộp tiền vào ngân sách nhà nước" → "State Budget Payment Slip"
+   - "Người nộp thuế" → "Taxpayer", "Mã số thuế" → "Tax code"
+   - "Thuế giá trị gia tăng" → "Value Added Tax (VAT)"
+   - "Thuế thu nhập cá nhân" → "Personal Income Tax"
+   - "Tổng số tiền" → "Total amount", "Số tiền bằng chữ" → "Amount in words"
+   - "Ông" → "Mr.", "Bà" → "Mrs."
+   - For tables (tax slips, transcripts): use visible borders: <table style="width:100%;border-collapse:collapse;font-size:7pt;">
+6. Do NOT wrap your response in markdown code fences.
+7. Return ONLY the HTML fragment — no explanations, no preamble.
+"""
+
 RECONSTRUCT_PROMPT = """\
 You are an expert Vietnamese-to-English consular document translator and HTML formatter.
 
-Below is raw OCR text extracted from a scanned Vietnamese legal document.
+⚠️ CRITICAL RULE: Your output HTML must contain ENGLISH TEXT ONLY. Every word must be translated from Vietnamese to English. Do NOT leave any Vietnamese words in your output. This is a TRANSLATION task, not a transcription task.
+
+Below is raw OCR text extracted from a scanned Vietnamese legal document (may be 1 or 2 pages combined).
 The OCR text may contain errors: missing diacritics, merged words, wrong characters.
+If the text contains "--- PAGE 2 (table/details section) ---", it means the second page belongs to the same document — combine both sections into ONE complete HTML output covering all content from both pages.
 
 Your task:
-1. Identify the document type (birth certificate, marriage certificate, land certificate, etc.)
-2. Reconstruct the correct content from context, fixing OCR errors
-3. Translate to formal English using standard consular terminology
+1. Identify the document type (birth certificate, marriage certificate, land certificate, tax payment slip, etc.)
+2. Reconstruct the correct Vietnamese content from context, fixing OCR errors
+3. Translate EVERYTHING to formal English — ALL labels, ALL values, ALL headers, ALL text in the output HTML must be in English
 4. Format as a SINGLE compact HTML fragment that MUST fit on one A4 page. Rules:
    - All text uses line-height:1; margin:0; padding:0 — no extra spacing anywhere
-   - Document title: <p style="text-align:center;margin:3px 0 1px 0;line-height:1;"><span style="font-size:11pt;font-weight:bold;">TITLE</span></p>
-   - Header lines (SOCIALIST REPUBLIC OF VIETNAM, Independence...): <p style="text-align:center;margin:0;line-height:1;"><span style="font-size:9pt;font-weight:bold;">text</span></p>
-   - Subtitle (ORIGINAL/COPY): <p style="text-align:center;margin:0;line-height:1;"><span style="font-size:9pt;">(text)</span></p>
-   - No./Book No.: <table style="width:100%;border:none;border-collapse:collapse;margin:1px 0;line-height:1;"><tr><td style="font-size:9pt;border:none;">No.: X</td><td style="font-size:9pt;text-align:right;border:none;">Book No.: Y</td></tr></table>
-   - Field label + value: <p style="margin:0;line-height:1;"><span style="font-size:9pt;"><b>Label:</b> value</span></p>
-   - Two fields on same line: <table style="width:100%;border:none;border-collapse:collapse;margin:0;"><tr><td style="font-size:9pt;border:none;width:50%;line-height:1;"><b>Label1:</b> val1</td><td style="font-size:9pt;border:none;line-height:1;"><b>Label2:</b> val2</td></tr></table>
+   - Document title: <p style="text-align:center;margin:2px 0 0 0;line-height:0.8;"><span style="font-size:11pt;font-weight:bold;">TITLE</span></p>
+   - Header lines (SOCIALIST REPUBLIC OF VIETNAM, Independence...): <p style="text-align:center;margin:0;line-height:0.8;"><span style="font-size:8pt;font-weight:bold;">text</span></p>
+   - Subtitle (ORIGINAL/COPY): <p style="text-align:center;margin:0;line-height:0.8;"><span style="font-size:8pt;">(text)</span></p>
+   - No./Book No.: <table style="width:100%;border:none;border-collapse:collapse;margin:0;"><tr><td style="font-size:8pt;border:none;line-height:0.8;">No.: X</td><td style="font-size:8pt;text-align:right;border:none;line-height:0.8;">Book No.: Y</td></tr></table>
+   - Field label + value: <p style="margin:0;line-height:0.8;"><span style="font-size:8pt;"><b>Label:</b> value</span></p>
+   - Two fields on same line: <table style="width:100%;border:none;border-collapse:collapse;margin:0;"><tr><td style="font-size:8pt;border:none;width:50%;line-height:0.8;"><b>Label1:</b> val1</td><td style="font-size:8pt;border:none;line-height:0.8;"><b>Label2:</b> val2</td></tr></table>
    - Three fields on same line: use 3-col borderless table, same style
    - CRITICAL: Do NOT invent section headers (FATHER, MOTHER, REGISTRATION DETAILS, etc.) not in the original. Only translate what exists.
-   - Signature block: right-aligned, 9pt, line-height:1, margin:0
+   - Signature block: right-aligned, 8pt, line-height:0.8, margin:0
    - Do NOT bold values. Only bold labels and document title.
 5. Consular terminology and formatting rules:
    - ONLY personal names (people's names) → write in UPPERCASE Latin without diacritics: e.g. Nguyễn Thịnh Trọng → NGUYEN THINH TRONG
@@ -219,6 +287,52 @@ Your task:
    - "Giấy chứng nhận quyền sử dụng đất" → "Certificate of Land Use Rights"
    - "Sở Tài nguyên và Môi trường" → "Department of Natural Resources and Environment"
    - "Ông" → "Mr.", "Bà" → "Mrs."
+   TAX / FINANCE DOCUMENT TERMS:
+   - "Giấy nộp tiền vào ngân sách nhà nước" → "State Budget Payment Slip"
+   - "Mẫu số" → "Form No.", "Mã hiệu" → "Code", "Số" / "Số:" → "No.:", "Số tham chiếu" → "Reference No."
+   - "Tiền mặt" → "Cash", "Chuyển khoản" → "Transfer", "Loại tiền" → "Currency", "Khác" → "Other"
+   - "Người nộp thuế" → "Taxpayer", "Mã số thuế" → "Tax code"
+   - "Địa chỉ" → "Address", "Quận/Huyện" → "District", "Tỉnh, TP" → "Province/City"
+   - "Người nộp thay" → "Payer on behalf"
+   - "Đề nghị NH/KBNN" → "Requesting Bank/State Treasury"
+   - "Trích TK số" → "Debit Account No.", "hoặc thu tiền mặt để nộp NSNN theo" → "or collect cash for State Budget payment according to"
+   - "TK thu NSNN" → "State Budget collection account"
+   - "TK tạm thu" → "Temporary collection account"
+   - "TK thu hồi hoàn thuế GTGT" → "VAT refund recovery account"
+   - "Vào tài khoản của KBNN" → "To the account of State Treasury"
+   - "Phòng giao dịch" → "Transaction Office", "KBNN khu vực" → "State Treasury Area"
+   - "Mở tại NH ủy nhiệm thu" → "Opened at collecting authorized bank"
+   - "Nộp theo văn bản của cơ quan có thẩm quyền" → "Payment according to document of competent authority"
+   - "Kiểm toán nhà nước" → "State Audit", "Thanh tra tài chính" → "Financial Inspectorate"
+   - "Thanh tra Chính phủ" → "Government Inspectorate", "Cơ quan có thẩm quyền khác" → "Other competent authority"
+   - "Tên cơ quan quản lý thu" → "Name of managing tax authority"
+   - "Phần dành cho người nộp thuế ghi" → "For taxpayer to fill in"
+   - "Phần dành cho NH ủy nhiệm thu/ NH phối hợp thu/ KBNN ghi" → "For authorized collecting bank / cooperating bank / State Treasury to fill in"
+   - "Số tờ khai/Số quyết định/Số thông báo/Mã định danh hồ sơ (ID)" → "Declaration No./Decision No./Notification No./Date/ID"
+   - "Kỳ thuế/Ngày quyết định/Ngày thông báo" → "Tax period/Date"
+   - "Nội dung các khoản nộp NSNN" → "Content of State Budget payments"
+   - "Mã chương" → "Chapter code", "Mã NDKT (TM)" → "Sub-item code (TM)", "Mã DBHC" → "Admin area code (DBHC)"
+   - "Số tiền VND" → "Amount in VND", "Số ngoại tệ nguyên tệ" → "Original currency amount"
+   - "Thuế giá trị gia tăng" / "Thuế GTGT" → "Value added tax (VAT)"
+   - "Thuế giá trị gia tăng hàng sản xuất trong nước" → "Value added tax on domestically manufactured goods"
+   - "Tổng số tiền" → "Total amount", "Tổng cộng" → "Total"
+   - "Tổng số tiền bằng chữ" → "Total amount in words"
+   - "Người nộp thuế" (signature) → "FOR TAXPAYER", "NH ủy nhiệm thu/KBNN" (signature) → "FOR AUTHORIZED COLLECTING BANK / STATE TREASURY"
+   - "Ký, ghi rõ họ tên, đóng dấu (nếu có)" → "(Sign, write full name, and stamp if applicable)"
+   - "Ký, ghi rõ họ tên, chức vụ và đóng dấu" → "(Sign, write full name, position, and stamp)"
+   - "CN" → "Branch", "Ngân hàng TMCP Quân đội" → "Military Commercial Joint Stock Bank"
+   - "Thuế thu nhập cá nhân" → "Personal income tax", "Thuế thu nhập doanh nghiệp" → "Corporate income tax"
+   TABLE RECONSTRUCTION RULES (for tax payment slip detail pages):
+   - The payment table has columns: STT | Declaration No./ID | Tax period | Content of State Budget payments | Original currency amount | Amount (VND) | Chapter code | Sub-item code (TM) | Admin area code (DBHC)
+   - Typical rows: Row 1 = Value added tax (VAT on domestic production), Sub-item 1701; Row 2 = Personal income tax from production/business, Sub-item 1003; Chapter code is always 757
+   - If OCR text is garbled and some amounts are missing, infer from Total: e.g. if Total=1,200,000 and PIT=400,000, then VAT=800,000
+   - Render the table WITH visible borders: <table style="width:100%;border-collapse:collapse;margin:2px 0;font-size:7pt;">
+   - Header row: <tr style="background:#f0f0f0;"><th style="border:1px solid #999;padding:2px 3px;text-align:center;">No.</th><th ...>Declaration No./ID</th>...</tr>
+   - Data rows: <tr><td style="border:1px solid #999;padding:2px 3px;text-align:center;">1</td>...</tr>
+   - Total row: <tr><td colspan="5" style="border:1px solid #999;padding:2px;font-weight:bold;">Total</td><td style="border:1px solid #999;padding:2px;text-align:right;font-weight:bold;">1,200,000</td><td colspan="3" style="border:1px solid #999;"></td></tr>
+   - "FOR STATE TREASURY TO FILL IN UPON ACCOUNTING:" section: use a compact bordered box, 7pt
+   - Signature section: two columns — left = PAYER, right = bank + date + staff names
+   - Do NOT omit any section visible in OCR (accounting box, signatures, staff names)
 
 Do NOT wrap your response in markdown code fences.
 Return ONLY the HTML fragment.
@@ -227,6 +341,33 @@ Return ONLY the HTML fragment.
 {text}
 --- END ---
 """
+
+
+def _clean_gemini_html(text: str) -> str:
+    text = re.sub(r"^```[a-z]*\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    return text.strip()
+
+
+def translate_scanned_image_to_html(image_b64: str, api_key: str | None = None) -> str:
+    """
+    Send a scanned page image directly to Gemini vision for translation.
+    This is the highest-quality path — Gemini reads the image natively,
+    bypassing OCR errors entirely.
+    """
+    key = api_key or GEMINI_API_KEY
+    for model in GEMINI_MODELS:
+        try:
+            raw = _call_gemini(model, key, VISION_PROMPT, image_b64=image_b64)
+            result = _clean_gemini_html(raw)
+            if result and len(result) > 30:
+                logger.info(f"Vision translation succeeded with model: {model}")
+                return result
+        except urllib.error.HTTPError as e:
+            logger.warning(f"Vision: model {model} HTTP {e.code}, trying next…")
+        except Exception as e:
+            logger.warning(f"Vision: model {model} failed: {e}, trying next…")
+    return ""
 
 
 def translate_scanned_to_html(raw_text: str, api_key: str | None = None) -> str:
@@ -238,13 +379,11 @@ def translate_scanned_to_html(raw_text: str, api_key: str | None = None) -> str:
     if not raw_text.strip():
         return "<p style='color:#999;text-align:center;'>No text extracted from this page.</p>"
 
-    prompt = RECONSTRUCT_PROMPT.replace("{text}", raw_text[:6000])
+    prompt = RECONSTRUCT_PROMPT.replace("{text}", raw_text[:8000])
     for model in GEMINI_MODELS:
         try:
             text = _call_gemini(model, key, prompt)
-            text = re.sub(r"^```[a-z]*\s*", "", text)
-            text = re.sub(r"\s*```$", "", text)
-            text = text.strip()
+            text = _clean_gemini_html(text)
             if text and len(text) > 30:
                 logger.info(f"Scanned reconstruction succeeded with model: {model}")
                 return text
@@ -281,14 +420,28 @@ def translate_html_document(pages: list[dict], api_key: str | None = None) -> li
     """
     Translate a list of HTML pages (output of html_extractor.pdf_to_html_pages).
     Returns the same list with an added "translated_html" key per page.
+
+    For scanned pages with image_b64: uses Gemini vision (highest quality).
+    Falls back to OCR-text path if vision fails.
     """
     from concurrent.futures import ThreadPoolExecutor
 
     def _translate_page(page: dict) -> dict:
+        is_scanned = page.get("is_scanned", False)
+        image_b64 = page.get("image_b64")
+
+        # Best path: send actual image to Gemini vision
+        if is_scanned and image_b64:
+            translated = translate_scanned_image_to_html(image_b64, api_key)
+            if translated:
+                return {**page, "translated_html": translated}
+            logger.warning(f"Page {page['page_num']}: vision failed, falling back to OCR text path")
+
+        # Fallback: OCR text → Gemini text
         translated = translate_html_page(
             page["html"],
             api_key,
-            is_scanned=page.get("is_scanned", False),
+            is_scanned=is_scanned,
         )
         return {**page, "translated_html": translated}
 

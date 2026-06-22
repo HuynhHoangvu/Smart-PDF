@@ -132,7 +132,7 @@ def _add_html_page_to_doc(doc: Document, html: str):
         fmt = p.paragraph_format
         fmt.space_before = Pt(para.space_before)
         fmt.space_after = Pt(0)
-        fmt.line_spacing = 1.0
+        fmt.line_spacing = 0.8
         for span in para.spans:
             run = p.add_run(span.text)
             run.bold = span.bold
@@ -162,10 +162,11 @@ def build_docx_from_translation(translation_result: dict) -> bytes:
     # Configure default style
     style = doc.styles['Normal']
     style.font.name = 'Times New Roman'
-    style.font.size = Pt(9 if is_html_mode else 13)
+    style.font.size = Pt(8 if is_html_mode else 13)
     p_format = style.paragraph_format
-    p_format.line_spacing = 1.0 if is_html_mode else 1.25
-    p_format.space_after = Pt(0) if is_html_mode else Pt(4)
+    p_format.line_spacing = 0.8 if is_html_mode else 1.25
+    p_format.space_after = Pt(0)
+    p_format.space_before = Pt(0)
     p_format.space_before = Pt(0)
 
     # Process page by page
