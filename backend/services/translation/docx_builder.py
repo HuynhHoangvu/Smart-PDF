@@ -1,15 +1,13 @@
 import io
 import re
-from html.parser import HTMLParser
 from docx import Document
-from docx.shared import Pt, Inches, RGBColor
+from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
 
 def _pt_from_style(style_str: str, default: float = 9.0) -> float:
-    """Extract font-size in pt from inline style string."""
     m = re.search(r"font-size\s*:\s*([\d.]+)pt", style_str or "")
     return float(m.group(1)) if m else default
 
@@ -17,128 +15,271 @@ def _pt_from_style(style_str: str, default: float = 9.0) -> float:
 def _is_bold(style_str: str, tag: str = "") -> bool:
     if tag in ("b", "strong"):
         return True
-    if "font-weight:bold" in (style_str or "").replace(" ", ""):
-        return True
-    return False
+    return "font-weight:bold" in (style_str or "").replace(" ", "")
 
 
 def _align_from_style(style_str: str) -> WD_ALIGN_PARAGRAPH:
-    if "text-align:center" in (style_str or "").replace(" ", ""):
+    s = (style_str or "").replace(" ", "")
+    if "text-align:center" in s:
         return WD_ALIGN_PARAGRAPH.CENTER
-    if "text-align:right" in (style_str or "").replace(" ", ""):
+    if "text-align:right" in s:
         return WD_ALIGN_PARAGRAPH.RIGHT
     return WD_ALIGN_PARAGRAPH.LEFT
 
 
-# ── Paragraph-level HTML → docx converter ────────────────────────────────────
-
-class _Span:
-    __slots__ = ("text", "bold", "size", "italic")
-    def __init__(self, text, bold=False, size=9.0, italic=False):
-        self.text = text
-        self.bold = bold
-        self.size = size
-        self.italic = italic
-
-
-class _Para:
-    __slots__ = ("spans", "align", "space_before")
-    def __init__(self, align=WD_ALIGN_PARAGRAPH.LEFT, space_before=0):
-        self.spans: list[_Span] = []
-        self.align = align
-        self.space_before = space_before  # pt before this paragraph
+def _table_has_borders(table_el) -> bool:
+    """Return True if this table is a data table with visible borders."""
+    # Check first td/th for border:none
+    first_cell = table_el.find(["td", "th"])
+    if not first_cell:
+        return False
+    style = first_cell.get("style", "").replace(" ", "")
+    if "border:none" in style or "border:0" in style:
+        return False
+    table_style = table_el.get("style", "").replace(" ", "")
+    if "border:none" in table_style:
+        return False
+    # Has explicit border → data table
+    return "border:" in style or "border:" in table_style
 
 
-class _HtmlDocxParser(HTMLParser):
-    """Parse Gemini HTML fragment → list of _Para objects for python-docx."""
+def _clear_table_borders(tbl):
+    """Remove all borders from a python-docx table (table-level + every cell)."""
+    # Table-level borders
+    tblPr = tbl._tbl.tblPr
+    tblBorders = OxmlElement("w:tblBorders")
+    for name in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        el = OxmlElement(f"w:{name}")
+        el.set(qn("w:val"), "none")
+        el.set(qn("w:sz"), "0")
+        el.set(qn("w:color"), "auto")
+        tblBorders.append(el)
+    existing = tblPr.find(qn("w:tblBorders"))
+    if existing is not None:
+        tblPr.remove(existing)
+    tblPr.append(tblBorders)
 
-    BLOCK_TAGS = {"p", "div", "h1", "h2", "h3", "h4", "tr", "li", "br"}
+    # Cell-level borders (overrides inherited style)
+    for row in tbl.rows:
+        for cell in row.cells:
+            tc = cell._tc
+            tcPr = tc.get_or_add_tcPr()
+            tcBorders = OxmlElement("w:tcBorders")
+            for name in ("top", "left", "bottom", "right", "insideH", "insideV"):
+                el = OxmlElement(f"w:{name}")
+                el.set(qn("w:val"), "none")
+                el.set(qn("w:sz"), "0")
+                el.set(qn("w:color"), "auto")
+                tcBorders.append(el)
+            existing = tcPr.find(qn("w:tcBorders"))
+            if existing is not None:
+                tcPr.remove(existing)
+            tcPr.append(tcBorders)
 
-    def __init__(self):
-        super().__init__()
-        self.paras: list[_Para] = []
-        self._cur: _Para = _Para()
-        self._bold_stack: list[bool] = [False]
-        self._size_stack: list[float] = [9.0]
-        self._italic_stack: list[bool] = [False]
-        self._style_stack: list[str] = [""]
 
-    def _flush(self):
-        if any(s.text.strip() for s in self._cur.spans):
-            self.paras.append(self._cur)
-        self._cur = _Para()
+def _cell_inline_text(cell, default_bold=False, default_size=10.0):
+    """Walk a table cell and return list of (text, bold, italic, size) runs."""
+    from bs4 import NavigableString
+    runs = []
 
-    def handle_starttag(self, tag, attrs):
-        attrs_d = dict(attrs)
-        style = attrs_d.get("style", "")
-
-        if tag in self.BLOCK_TAGS:
-            self._flush()
-            align = _align_from_style(style)
-            # small top-margin for section breaks
-            space_before = 2.0 if "margin-top:4" in style.replace(" ", "") or "margin:4" in style.replace(" ", "") else 0.0
-            self._cur = _Para(align=align, space_before=space_before)
-
-        # span / b / strong / i / em
-        bold = _is_bold(style, tag) or self._bold_stack[-1]
-        size = _pt_from_style(style, self._size_stack[-1])
-        italic = (tag in ("i", "em")) or self._italic_stack[-1]
-
-        self._bold_stack.append(bold)
-        self._size_stack.append(size)
-        self._italic_stack.append(italic)
-        self._style_stack.append(style)
-
-    def handle_endtag(self, tag):
-        if self._bold_stack:
-            self._bold_stack.pop()
-            self._size_stack.pop()
-            self._italic_stack.pop()
-            self._style_stack.pop()
-        if tag in self.BLOCK_TAGS:
-            self._flush()
-
-    def handle_data(self, data):
-        text = data  # keep whitespace for inline joins
-        if not text.strip():
+    def _walk(node, bold=default_bold, size=default_size, italic=False):
+        if isinstance(node, NavigableString):
+            # Normalize whitespace: collapse newlines/tabs to single space
+            t = re.sub(r'\s+', ' ', str(node))
+            if t.strip():
+                runs.append((t, bold, italic, size))
+            elif t == ' ' and runs:  # preserve single space between words
+                runs.append((' ', bold, italic, size))
             return
-        self._cur.spans.append(_Span(
-            text=text,
-            bold=self._bold_stack[-1] if self._bold_stack else False,
-            size=self._size_stack[-1] if self._size_stack else 9.0,
-            italic=self._italic_stack[-1] if self._italic_stack else False,
-        ))
+        n_tag = getattr(node, "name", None)
+        if not n_tag or n_tag in ("script", "style"):
+            return
+        if n_tag == "br":
+            runs.append(("\n", bold, italic, size))
+            return
+        n_style = node.get("style", "")
+        n_bold = bold or _is_bold(n_style, n_tag)
+        n_size = _pt_from_style(n_style, size)
+        n_italic = italic or n_tag in ("i", "em")
+        for child in node.children:
+            _walk(child, n_bold, n_size, n_italic)
 
-    def get_paras(self) -> list[_Para]:
-        self._flush()
-        return self.paras
+    for child in cell.children:
+        _walk(child)
+    return runs
 
 
-def _html_to_docx_paras(html: str) -> list[_Para]:
-    # Remove spacer divs (<div style="height:Xpx"...>) — pure visual whitespace
-    html = re.sub(r'<div[^>]*aria-hidden[^>]*>.*?</div>', '', html, flags=re.DOTALL)
-    html = re.sub(r'<div[^>]*height\s*:\s*\d+px[^>]*>\s*</div>', '', html)
-    parser = _HtmlDocxParser()
-    parser.feed(html)
-    return parser.get_paras()
+def _add_bordered_table(doc: Document, table_el):
+    """Build a bordered DOCX table from a BS4 <table> element."""
+    from bs4 import NavigableString
+    rows = table_el.find_all("tr", recursive=True)
+    if not rows:
+        return
+    def _row_cols(tr):
+        return sum(int(c.get("colspan", 1)) for c in tr.find_all(["td", "th"]))
+    num_cols = max((_row_cols(r) for r in rows), default=0)
+    if num_cols == 0:
+        return
+
+    tbl = doc.add_table(rows=len(rows), cols=num_cols)
+    tbl.style = "Table Grid"
+
+    for r_idx, tr in enumerate(rows):
+        cells = tr.find_all(["td", "th"])
+        c_idx = 0
+        for cell in cells:
+            if c_idx >= num_cols:
+                break
+            style = cell.get("style", "")
+            cell_bold = cell.name == "th" or "font-weight:bold" in style.replace(" ", "")
+            cell_size = _pt_from_style(style, 10.0)
+            cell_align = _align_from_style(style)
+            try:
+                dcell = tbl.cell(r_idx, c_idx)
+                p = dcell.paragraphs[0]
+                p.alignment = cell_align
+                p.paragraph_format.space_after = Pt(0)
+                p.paragraph_format.space_before = Pt(0)
+                p.paragraph_format.line_spacing = 1.5
+                for text, bold, italic, size in _cell_inline_text(cell, cell_bold, cell_size):
+                    run = p.add_run(text)
+                    run.bold = bold
+                    run.italic = italic
+                    run.font.name = "Times New Roman"
+                    run.font.size = Pt(size)
+            except IndexError:
+                pass
+            c_idx += int(cell.get("colspan", 1))
+
+
+def _is_signature_table(table_el) -> bool:
+    """Detect signature/stamp block: ≤4 rows, cells mostly center-aligned."""
+    rows = table_el.find_all("tr", recursive=True)
+    if len(rows) > 4:
+        return False
+    cells = table_el.find_all(["td", "th"])
+    if not cells:
+        return False
+    center = sum(1 for c in cells if "text-align:center" in c.get("style","").replace(" ",""))
+    return center >= len(cells) / 2
 
 
 def _add_html_page_to_doc(doc: Document, html: str):
-    """Convert one page's translated_html into python-docx paragraphs."""
-    paras = _html_to_docx_paras(html)
-    for para in paras:
+    """
+    Convert translated HTML to DOCX.
+    - Bordered tables (data tables with visible lines) → DOCX Table Grid
+    - Borderless tables (layout/fields/signatures) → plain text paragraphs
+    - <p>, <h1-h4> → paragraphs preserving bold/italic/size/alignment
+    """
+    from bs4 import BeautifulSoup, NavigableString
+
+    SKIP_TAGS = {"style", "script", "head"}
+    DEFAULT_SIZE = 9.0
+
+    def _el_text(el) -> str:
+        parts = []
+        for node in el.descendants:
+            if isinstance(node, NavigableString):
+                t = str(node).strip()
+                if t:
+                    parts.append(t)
+        return " ".join(parts)
+
+    def _add_para_inline(el):
+        """Add a <p>/<h*> paragraph preserving inline bold/italic spans."""
+        style = el.get("style", "")
+        tag = el.name
+        base_bold = _is_bold(style, tag) or tag in ("h1", "h2", "h3", "h4")
+        base_size = _pt_from_style(style, DEFAULT_SIZE)
+        align_str = "center" if "text-align:center" in style.replace(" ", "") else \
+                    "right"  if "text-align:right"  in style.replace(" ", "") else "left"
+
+        runs = _cell_inline_text(el, default_bold=base_bold, default_size=base_size)
+        if not any(t.strip() for t, *_ in runs):
+            return
         p = doc.add_paragraph()
-        p.alignment = para.align
-        fmt = p.paragraph_format
-        fmt.space_before = Pt(para.space_before)
-        fmt.space_after = Pt(0)
-        fmt.line_spacing = 0.8
-        for span in para.spans:
-            run = p.add_run(span.text)
-            run.bold = span.bold
-            run.italic = span.italic
+        p.alignment = _align_from_style(f"text-align:{align_str}")
+        p.paragraph_format.space_after = Pt(4)
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.line_spacing = 1.5
+        for text, bold, italic, size in runs:
+            run = p.add_run(text)
+            run.bold = bold
+            run.italic = italic
             run.font.name = "Times New Roman"
-            run.font.size = Pt(span.size)
+            run.font.size = Pt(size)
+
+    def _process_borderless_table(table_el):
+        """Borderless layout table → paragraphs per row, preserving <br> as line breaks."""
+        tbody = table_el.find("tbody") or table_el
+        for tr in tbody.find_all("tr", recursive=False):
+            cells = tr.find_all(["td", "th"], recursive=False)
+            if not cells:
+                continue
+
+            # Detect alignment & bold from first non-empty cell
+            bold = any("font-weight:bold" in c.get("style","").replace(" ","") or c.name == "th"
+                       for c in cells)
+            size = _pt_from_style(tr.get("style", ""), DEFAULT_SIZE)
+            center_count = sum(1 for c in cells if "text-align:center" in c.get("style","").replace(" ",""))
+            align_str = "center" if center_count > len(cells) / 2 else "left"
+
+            # Build runs for entire row: cells joined, <br> preserved as newline
+            all_runs = []
+            for i, cell in enumerate(cells):
+                if i > 0:
+                    cell_text = _el_text(cell)
+                    if cell_text:
+                        all_runs.append(("     ", bold, False, size))
+                cstyle = cell.get("style", "")
+                c_bold = bold or "font-weight:bold" in cstyle.replace(" ", "") or cell.name == "th"
+                c_size = _pt_from_style(cstyle, size)
+                all_runs.extend(_cell_inline_text(cell, c_bold, c_size))
+
+            if not any(t.strip() for t, *_ in all_runs):
+                continue
+
+            p = doc.add_paragraph()
+            p.alignment = _align_from_style(f"text-align:{align_str}")
+            p.paragraph_format.space_after = Pt(4)
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.line_spacing = 1.5
+            for text, b, italic, sz in all_runs:
+                run = p.add_run(text)
+                run.bold = b
+                run.italic = italic
+                run.font.name = "Times New Roman"
+                run.font.size = Pt(sz)
+
+    def _process(el):
+        if isinstance(el, NavigableString):
+            return
+        tag = el.name
+        if not tag or tag in SKIP_TAGS:
+            return
+
+        if tag == "table":
+            if _table_has_borders(el):
+                _add_bordered_table(doc, el)
+            elif _is_signature_table(el):
+                _add_bordered_table(doc, el)   # creates table, then clears borders below
+                _clear_table_borders(doc.tables[-1])
+            else:
+                _process_borderless_table(el)
+            return
+
+        if tag in ("p", "h1", "h2", "h3", "h4"):
+            _add_para_inline(el)
+            return
+
+        # div and other containers → recurse
+        for child in el.children:
+            _process(child)
+
+    soup = BeautifulSoup(html, "html.parser")
+    for child in soup.children:
+        _process(child)
+
 
 
 def build_docx_from_translation(translation_result: dict) -> bytes:
@@ -151,22 +292,24 @@ def build_docx_from_translation(translation_result: dict) -> bytes:
 
     doc = Document()
 
-    # Page setup: narrow margins for HTML mode to fit more content
-    margin = Inches(0.8) if is_html_mode else Inches(1)
+    # A4, consular margins: Top/Bottom 1in, Left/Right 1.25in
     for section in doc.sections:
-        section.top_margin = margin
-        section.bottom_margin = margin
-        section.left_margin = margin
-        section.right_margin = margin
+        section.page_width    = Inches(8.27)
+        section.page_height   = Inches(11.69)
+        section.top_margin    = Inches(1.0)
+        section.bottom_margin = Inches(1.0)
+        section.left_margin   = Inches(1.25)
+        section.right_margin  = Inches(1.25)
 
-    # Configure default style
-    style = doc.styles['Normal']
-    style.font.name = 'Times New Roman'
-    style.font.size = Pt(8 if is_html_mode else 13)
-    p_format = style.paragraph_format
-    p_format.line_spacing = 0.8 if is_html_mode else 1.25
-    p_format.space_after = Pt(0)
-    p_format.space_before = Pt(0)
+    # Default style: Times New Roman 12pt, line spacing 1.5
+    normal = doc.styles['Normal']
+    normal.font.name = 'Times New Roman'
+    normal.font.size = Pt(9)
+    normal.element.rPr.rFonts.set(qn('w:ascii'), 'Times New Roman')
+    normal.element.rPr.rFonts.set(qn('w:hAnsi'), 'Times New Roman')
+    p_format = normal.paragraph_format
+    p_format.line_spacing = 1.5
+    p_format.space_after = Pt(4)
     p_format.space_before = Pt(0)
 
     # Process page by page
@@ -174,7 +317,6 @@ def build_docx_from_translation(translation_result: dict) -> bytes:
         if p_idx > 0:
             doc.add_page_break()
 
-        # ── HTML mode: convert HTML → docx paragraphs preserving formatting ──
         if is_html_mode:
             _add_html_page_to_doc(doc, page.get("translated_html", ""))
             continue

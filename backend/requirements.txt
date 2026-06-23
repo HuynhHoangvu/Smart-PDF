@@ -1,5 +1,8 @@
 fastapi
 google-genai
+htmldocx
+xhtml2pdf
+beautifulsoup4
 uvicorn
 pypdf
 python-docx

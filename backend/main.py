@@ -8,9 +8,8 @@ from services.pdf_merger import merge_pdfs
 from services.pdf_compressor import compress_pdf
 from services.pdf_page_merger import merge_pages_by_manifest
 from services.pdf_to_word import convert_pdf_bytes_to_docx_bytes, parse_pdf_to_blocks, build_docx_from_blocks
-from services.translation import extract_structured, build_docx_from_translation
+from services.translation import build_docx_from_translation
 from services.translation.html_extractor import pdf_to_html_pages
-from services.translation.html_translator import translate_scanned_to_html
 
 # Upload limits: unlimited (no cap applied)
 
@@ -121,7 +120,7 @@ async def api_translate_pdf_html(
     import fitz  # PyMuPDF
     import re as _re
     from concurrent.futures import ThreadPoolExecutor
-    from services.translation.html_translator import translate_html_page, translate_pdf_page_to_html
+    from services.translation.html_translator import translate_pdf_page_to_html
 
     def _extract_pages_as_pdf_b64(pdf_bytes: bytes, *page_nums: int) -> str:
         """Extract one or more pages from a PDF and return as base64 PDF bytes."""
@@ -156,34 +155,27 @@ async def api_translate_pdf_html(
         def _translate_group(group):
             page_list = group["pages"]
             if group["paired"]:
-                # Send both pages as a single 2-page PDF → one Gemini call
                 b64 = _extract_pages_as_pdf_b64(content, page_list[0]["page_num"], page_list[1]["page_num"])
                 translated_html = translate_pdf_page_to_html(b64)
                 if not translated_html:
-                    # fallback: translate individually
                     h1 = translate_pdf_page_to_html(_extract_pages_as_pdf_b64(content, page_list[0]["page_num"]))
                     h2 = translate_pdf_page_to_html(_extract_pages_as_pdf_b64(content, page_list[1]["page_num"]))
                     translated_html = h1 + h2
                 group_pages = [p["page_num"] for p in page_list]
                 lead = {**page_list[0], "translated_html": translated_html,
-                        "group_id": page_list[0]["page_num"], "is_group_lead": True,
-                        "group_pages": group_pages}
+                        "group_id": page_list[0]["page_num"], "is_group_lead": True, "group_pages": group_pages}
                 follower = {**page_list[1], "translated_html": "",
-                            "group_id": page_list[0]["page_num"], "is_group_lead": False,
-                            "group_pages": group_pages}
+                            "group_id": page_list[0]["page_num"], "is_group_lead": False, "group_pages": group_pages}
                 return [lead, follower]
             else:
                 p = page_list[0]
-                if p.get("is_scanned"):
-                    b64 = _extract_pages_as_pdf_b64(content, p["page_num"])
-                    translated_html = translate_pdf_page_to_html(b64)
-                    if not translated_html:
-                        translated_html = "<p style='color:#e53e3e;text-align:center;'>Translation failed for this page.</p>"
-                else:
-                    translated_html = translate_html_page(p["html"], is_scanned=False)
+                # Always send PDF directly to Gemini — works for both text and scanned PDFs
+                b64 = _extract_pages_as_pdf_b64(content, p["page_num"])
+                translated_html = translate_pdf_page_to_html(b64)
+                if not translated_html:
+                    translated_html = "<p style='color:#e53e3e;text-align:center;'>Translation failed for this page.</p>"
                 return [{**p, "translated_html": translated_html,
-                         "group_id": p["page_num"], "is_group_lead": True,
-                         "group_pages": [p["page_num"]]}]
+                         "group_id": p["page_num"], "is_group_lead": True, "group_pages": [p["page_num"]]}]
 
         # Translate groups in parallel (max 4 concurrent Gemini calls)
         with ThreadPoolExecutor(max_workers=4) as ex:
@@ -193,6 +185,7 @@ async def api_translate_pdf_html(
         return {
             "original_filename": file.filename or "document.pdf",
             "total_pages": len(translated_pages),
+            "mode": "html",
             "pages": translated_pages,
         }
     except Exception as e:
@@ -207,40 +200,50 @@ class DownloadEditedRequest(BaseModel):
 
 @app.post("/api/translate-pdf/download-pdf")
 async def api_translate_pdf_download_pdf(request: DownloadEditedRequest):
-    """Convert translated HTML pages to a formatted PDF using WeasyPrint."""
+    """Convert translated HTML pages to PDF using xhtml2pdf."""
     try:
-        import weasyprint
+        from xhtml2pdf import pisa
 
         result = request.result
         pages = result.get("pages", [])
 
-        # Build full HTML document from all pages
+        import re as _re
+        def _strip_margins(html: str) -> str:
+            """Remove margin/padding from inline styles so xhtml2pdf doesn't add extra space."""
+            html = _re.sub(r'margin\s*:\s*[\d.]+[a-z%]*(\s+[\d.]+[a-z%]*){0,3}\s*;?', 'margin:0;', html)
+            html = _re.sub(r'padding\s*:\s*[\d.]+[a-z%]*(\s+[\d.]+[a-z%]*){0,3}\s*;?', 'padding:1px 2px;', html)
+            html = _re.sub(r'line-height\s*:\s*[\d.]+\s*;?', 'line-height:1.1;', html)
+            return html
+
         page_htmls = []
         for page in pages:
-            html = page.get("translated_html", "")
-            page_htmls.append(
-                f'<div class="doc-page">{html}</div>'
-            )
+            html = _strip_margins(page.get("translated_html", ""))
+            page_htmls.append(f'<div class="doc-page">{html}</div>')
 
         full_html = f"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
 <style>
-  @page {{ margin: 2cm 2.2cm; size: A4; }}
-  body {{ font-family: "Times New Roman", Times, serif; font-size: 11pt; color: #1a202c; }}
+  @page {{ margin: 1cm 1.5cm; size: A4; }}
+  body {{ font-family: "Times New Roman", Times, serif; font-size: 7.5pt; color: #000; line-height: 1.1; }}
   .doc-page {{ page-break-after: always; }}
   .doc-page:last-child {{ page-break-after: avoid; }}
-  table {{ width: 100%; border-collapse: collapse; }}
-  td {{ vertical-align: top; }}
-  p {{ margin: 2px 0; line-height: 1.4; }}
+  table {{ width: 100%; border-collapse: collapse; font-size: 7pt; table-layout: fixed; }}
+  td, th {{ vertical-align: top; word-wrap: break-word; overflow: hidden; padding: 1px 2px; }}
+  p {{ margin: 0; padding: 0; line-height: 1.1; }}
+  div {{ margin: 0; padding: 0; }}
 </style>
 </head>
 <body>{"".join(page_htmls)}</body>
 </html>"""
 
-        pdf_bytes = weasyprint.HTML(string=full_html).write_pdf()
+        pdf_buffer = io.BytesIO()
+        pisa_status = pisa.CreatePDF(full_html.encode("utf-8"), dest=pdf_buffer, encoding="utf-8")
+        if pisa_status.err:
+            raise HTTPException(status_code=500, detail="PDF generation failed")
 
+        pdf_bytes = pdf_buffer.getvalue()
         base_name = (result.get("original_filename") or "document").rsplit(".", 1)[0]
         out_filename = f"{base_name}_translated.pdf"
 
@@ -249,6 +252,8 @@ async def api_translate_pdf_download_pdf(request: DownloadEditedRequest):
             media_type="application/pdf",
             headers={"Content-Disposition": make_safe_filename_header(out_filename)},
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -257,6 +262,7 @@ async def api_translate_pdf_download_pdf(request: DownloadEditedRequest):
 async def api_translate_pdf_download_edited_docx(request: DownloadEditedRequest):
     try:
         result = request.result
+        logger.info(f"download-edited-docx: mode={result.get('mode')}, pages={len(result.get('pages',[]))}")
         docx_bytes = build_docx_from_translation(result)
         out_filename = "translated_edited.docx"
         if "original_filename" in result:
@@ -269,6 +275,8 @@ async def api_translate_pdf_download_edited_docx(request: DownloadEditedRequest)
             headers={"Content-Disposition": make_safe_filename_header(out_filename)}
         )
     except Exception as e:
+        logger.error(f"download-edited-docx failed: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 
