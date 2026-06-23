@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import {
   Plus, Trash2, RotateCcw, RotateCw, ChevronDown,
   ArrowRight, Grid, List as ListIcon, SortAsc, Eye, X,
@@ -7,7 +7,7 @@ import {
 import PdfRenderer from './PdfRenderer';
 import MergeResult from './MergeResult';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // ── Build flat page list from files array ────────────────────────────────────
 const buildPageList = (files) =>

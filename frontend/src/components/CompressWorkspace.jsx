@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { FileDown, RefreshCw, Loader2, Minimize2, Settings, Zap } from 'lucide-react';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const CompressWorkspace = ({ initialFiles, onCancel }) => {
   const file = initialFiles[0]; // Compress tool processes 1 file at a time
