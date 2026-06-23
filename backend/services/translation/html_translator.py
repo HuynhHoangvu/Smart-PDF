@@ -234,6 +234,8 @@ TRANSLATION RULES:
 - "Thủ trưởng đơn vị" → "Head of Unit"; "Kiểm soát viên" → "Controller"
 - "Ông" → "Mr."; "Bà" → "Mrs."
 
+IGNORE STAMPS & SEALS: Official circular stamps (con dấu/mộc đỏ) are decorative — do NOT translate or include their text in the output.
+
 Do NOT wrap output in markdown code fences.
 Return ONLY the HTML fragment — no explanations, no preamble.
 """
