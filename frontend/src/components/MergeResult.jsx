@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { Download, ChevronLeft, ChevronRight, RefreshCw, ChevronDown, Share2, Printer, Trash2, CheckCircle2, Edit2 } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, RefreshCw, ChevronDown, Printer, Trash2, CheckCircle2, Edit2, Loader2 } from 'lucide-react';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -12,8 +14,20 @@ const MergeResult = ({ blob, initialName = 'merged', onRestart }) => {
   const [editingName, setEditingName] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [numPages, setNumPages] = useState(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportingDocx, setExportingDocx] = useState(false);
+  const exportMenuRef = useRef(null);
   // Create stable object URL once
   const [objectUrl] = useState(() => URL.createObjectURL(blob));
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target))
+        setShowExportMenu(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const fileSizeMB = (blob.size / 1024 / 1024).toFixed(1);
 
@@ -24,6 +38,28 @@ const MergeResult = ({ blob, initialName = 'merged', onRestart }) => {
     document.body.appendChild(a);
     a.click();
     a.remove();
+  };
+
+  const handleExportDocx = async () => {
+    setShowExportMenu(false);
+    setExportingDocx(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', blob, (fileName || 'merged') + '.pdf');
+      const res = await fetch(`${API_URL}/api/pdf-to-word`, { method: 'POST', body: formData });
+      if (!res.ok) throw new Error('Chuyển đổi thất bại');
+      const docxBlob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(docxBlob);
+      a.download = (fileName || 'merged') + '.docx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      alert('Xuất DOCX thất bại: ' + err.message);
+    } finally {
+      setExportingDocx(false);
+    }
   };
 
   return (
@@ -99,16 +135,58 @@ const MergeResult = ({ blob, initialName = 'merged', onRestart }) => {
         </button>
 
         {/* Export as */}
-        <button className="btn btn-outline result-export-btn">
-          <span>Xuất dưới dạng</span>
-          <ChevronDown size={14} />
-        </button>
+        <div style={{ position: 'relative' }} ref={exportMenuRef}>
+          <button
+            className="btn btn-outline result-export-btn"
+            onClick={() => setShowExportMenu(v => !v)}
+            disabled={exportingDocx}
+          >
+            {exportingDocx
+              ? <><Loader2 size={14} className="spin" /> Đang xuất...</>
+              : <><span>Xuất dưới dạng</span><ChevronDown size={14} /></>}
+          </button>
+          {showExportMenu && (
+            <div style={{
+              position: 'absolute', top: '110%', left: 0, right: 0,
+              background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.10)', zIndex: 100, overflow: 'hidden'
+            }}>
+              <button
+                onClick={handleDownload}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                  padding: '10px 16px', background: 'none', border: 'none',
+                  cursor: 'pointer', fontSize: 14, color: '#1e293b', textAlign: 'left'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}
+              >
+                <span style={{ fontSize: 18 }}>📄</span> PDF (.pdf)
+              </button>
+              <button
+                onClick={handleExportDocx}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                  padding: '10px 16px', background: 'none', border: 'none',
+                  cursor: 'pointer', fontSize: 14, color: '#1e293b', textAlign: 'left',
+                  borderTop: '1px solid #f1f5f9'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}
+              >
+                <span style={{ fontSize: 18 }}>📝</span> Word (.docx)
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Action icons row */}
         <div className="result-icon-row">
-          <button className="result-icon-btn" title="Chia sẻ"><Share2 size={18} /></button>
-          <button className="result-icon-btn" title="In"><Printer size={18} /></button>
-          <button className="result-icon-btn danger" title="Xóa"><Trash2 size={18} /></button>
+          <button className="result-icon-btn" title="In" onClick={() => {
+            const w = window.open(objectUrl);
+            w?.addEventListener('load', () => w.print());
+          }}><Printer size={18} /></button>
+          <button className="result-icon-btn danger" title="Xóa" onClick={onRestart}><Trash2 size={18} /></button>
         </div>
 
         <div className="result-divider" />
