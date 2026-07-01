@@ -459,22 +459,26 @@ async def api_pdf_to_images(
 @app.post("/api/images-to-pdf")
 async def api_images_to_pdf(files: list[UploadFile] = File(...)):
     try:
-        import fitz
-        doc = fitz.open()
+        from PIL import Image as PILImage
+        pages = []
         for f in files:
             data = await f.read()
-            img_doc = fitz.open(stream=data, filetype="image")
-            rect = img_doc[0].rect
-            page = doc.new_page(width=rect.width, height=rect.height)
-            page.show_pdf_page(rect, img_doc, 0)
-            img_doc.close()
-        pdf_bytes = doc.tobytes()
-        doc.close()
+            img = PILImage.open(io.BytesIO(data))
+            if img.mode not in ("RGB", "L"):
+                img = img.convert("RGB")
+            pages.append(img)
+        if not pages:
+            raise HTTPException(status_code=400, detail="Không có ảnh hợp lệ")
+        buf = io.BytesIO()
+        pages[0].save(buf, format="PDF", save_all=True, append_images=pages[1:])
+        buf.seek(0)
         return StreamingResponse(
-            io.BytesIO(pdf_bytes),
+            buf,
             media_type="application/pdf",
             headers={"Content-Disposition": "attachment; filename=converted.pdf"},
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
