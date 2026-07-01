@@ -7,9 +7,9 @@ import os
 
 logger = logging.getLogger(__name__)
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or "AIzaSyBjAY03-8JWPUivjmIn3uwJBOu2HTPB2Cc"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODELS = [
-    "gemini-2.5-flash",
+    "gemini-2.0-flash",
     "gemini-1.5-flash",
 ]
 
