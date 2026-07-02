@@ -36,3 +36,7 @@ Thumbs.db
 
 # Blackbox
 .blackboxcli/
+.blackbox/tmp/
+
+# Personal test files
+frontend/public/221A011246_HuynhHoangvu.docx
