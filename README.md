@@ -1,62 +1,36 @@
-# SmartPDF
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-Công cụ xử lý và dịch PDF tiếng Việt sang tiếng Anh.
+## Getting Started
 
-## Khởi chạy local
-
-Mở **2 terminal riêng**, chạy cùng lúc:
-
-### Terminal 1 — Backend
+First, run the development server:
 
 ```bash
-cd backend
-py -3 -m uvicorn main:app --reload --port 8000
-```
-
-> API docs: http://localhost:8000/docs
-
-### Terminal 2 — Frontend
-
-```bash
-cd frontend
-npm install        # chỉ cần chạy lần đầu
 npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-> App: http://localhost:5173
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
----
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-## Biến môi trường
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-Tạo file `backend/.env` (tùy chọn):
+## Learn More
 
-```
-GEMINI_API_KEY=your_key_here
-DEEPL_API_KEY=your_key_here   # không bắt buộc
-```
+To learn more about Next.js, take a look at the following resources:
 
-Nếu không có `.env`, backend dùng key mặc định trong `html_translator.py`.
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
----
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy (Railway)
+## Deploy on Vercel
 
-- **Backend**: tự động deploy từ thư mục `backend/`
-- **Frontend**: cần set biến môi trường `VITE_API_URL=https://<backend-url>.railway.app`
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
----
-
-## Các tính năng
-
-| Công cụ | Mô tả |
-|---|---|
-| Gộp PDF | Ghép nhiều file PDF thành một |
-| Nén PDF | Giảm dung lượng file PDF |
-| Cắt PDF | Tách PDF theo khoảng trang |
-| PDF → Word | Chuyển PDF sang DOCX |
-| Word → PDF | Chuyển DOCX sang PDF |
-| PDF → Hình ảnh | Xuất từng trang PDF thành ảnh PNG/JPG |
-| Hình ảnh → PDF | Ghép nhiều ảnh thành PDF |
-| Chuyển đổi ảnh | Chuyển định dạng JPG ↔ PNG ↔ WEBP |
-| Dịch PDF | Dịch PDF tiếng Việt → tiếng Anh (Gemini Vision) |
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

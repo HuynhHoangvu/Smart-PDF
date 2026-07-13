@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"from services.translation.html_extractor import pdf_to_html_pages; from services.translation.html_translator import translate_html_document; print\\('imports OK'\\)\")",
+      "Bash(py -3 -c \"from services.translation.html_extractor import pdf_to_html_pages; from services.translation.html_translator import translate_html_document; print\\('imports OK'\\)\")",
+      "Bash(Remove-Item \"D:\\\\Fly_Visa\\\\SmartPDF\\\\backend\\\\services\\\\pdf_layout_translator.py\" -Force)",
+      "Bash(Remove-Item \"D:\\\\Fly_Visa\\\\SmartPDF\\\\backend\\\\services\\\\pdf_translator.py\" -Force)",
+      "Bash(Remove-Item \"D:\\\\Fly_Visa\\\\SmartPDF\\\\backend\\\\services\\\\pdf_reader.py\" -Force)",
+      "Bash(Remove-Item \"D:\\\\Fly_Visa\\\\SmartPDF\\\\frontend\\\\src\\\\components\\\\WordResult.jsx\" -Force)",
+      "Bash(Write-Output \"Deleted 4 files\")",
+      "PowerShell(Remove-Item *)"
+    ]
+  }
+}

@@ -4,81 +4,54 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SmartPDF is a Vietnamese PDF tools web app. It has a FastAPI backend (`backend/`) and a React + Vite frontend (`frontend/`). The primary feature is translating Vietnamese legal documents (birth certificates, marriage certificates, school transcripts, etc.) to English using AI.
+SmartPDF is a Vietnamese PDF tools web app, built as a single Next.js 16 (App Router) + TypeScript project deployable on Vercel — no separate backend, no database. The primary feature is translating Vietnamese legal documents (birth certificates, marriage certificates, school transcripts, etc.) to English using Gemini.
+
+This was migrated from an earlier FastAPI (Python) + React/Vite architecture. The old `backend/`/`frontend/` split is gone; API routes and UI now live in one app.
 
 ## Running the Project
 
-**Backend** (from `backend/`):
-```
-uvicorn main:app --reload --port 8000
-```
-
-**Frontend** (from `frontend/`):
 ```
 npm install
-npm run dev       # dev server at http://localhost:5173
+npm run dev       # dev server at http://localhost:3000 (or next available port)
 npm run build     # production build
 npm run lint      # ESLint
-npm run preview   # preview production build
 ```
 
-The frontend proxies API calls to `http://localhost:8000` — both must run simultaneously.
+Frontend and API routes are same-origin — no proxy/env base URL needed (`fetch("/api/...")`).
 
 ## Environment Variables
 
-The backend reads these at startup:
-- `GEMINI_API_KEY` — Gemini API key (has a hardcoded fallback key in `engine.py` and `html_translator.py`)
-- `DEEPL_API_KEY` — optional; enables DeepL as translation backend instead of Google Translate
+- `GEMINI_API_KEY` — required for translate (`/api/translate-pdf/*`) and the OCR fallback in `/api/pdf-to-word`. No hardcoded fallback key; must be set in `.env.local` / Vercel project settings.
 
 ## Architecture
 
-### Backend API (`backend/main.py`)
+### Routes (`app/`)
+- `app/page.tsx` — Home (tool grid)
+- `app/tool/[toolId]/page.tsx` — dispatcher that renders the matching Workspace component (mirrors the old `ToolPage.jsx`). `MergeWorkspace`, `SplitWorkspace`, `TranslateWorkspace` are loaded via `next/dynamic({ ssr: false })` because they import `react-pdf`, which touches browser-only globals (`DOMMatrix`) at module-eval time.
 
-FastAPI app with one file per endpoint group. All endpoints return `StreamingResponse` with binary files or JSON. Key API routes:
-- `POST /api/merge` — merge PDFs
-- `POST /api/merge-pages` — merge specific pages by manifest JSON
-- `POST /api/compress` — compress PDF (level: low/medium/high)
-- `POST /api/split` — split PDF by page ranges, returns ZIP
-- `POST /api/translate-pdf` — structured bilingual JSON (block-by-block)
-- `POST /api/translate-pdf/html` — HTML-based translation (better layout fidelity)
-- `POST /api/translate-pdf/download-docx` — direct DOCX download
-- `POST /api/translate-pdf/download-pdf` — HTML→PDF via WeasyPrint
-- `POST /api/pdf-to-word` — PDF to DOCX conversion
-- `POST /api/pdf-to-images` — render PDF pages as base64 images
-- `POST /api/images-to-pdf`, `POST /api/word-to-pdf`, `POST /api/convert-image`
+### API routes (`app/api/*/route.ts`)
+All are Node runtime (`export const runtime = "nodejs"` where native/Node-only deps are used).
+- `POST /api/merge`, `/api/merge-pages`, `/api/split`, `/api/images-to-pdf` — pure `pdf-lib`, no native deps
+- `POST /api/compress`, `/api/pdf-to-images` — rasterize pages via `pdfjs-dist/legacy` + `@napi-rs/canvas` (see `lib/pdfRaster.ts`); pdfjs's worker must be pointed at a `file://` URL on Windows/Node (`pathToFileURL`), and `GlobalWorkerOptions.workerSrc` must be set unconditionally — pdfjs applies its own default before any `if (!workerSrc)` guard would see it unset
+- `POST /api/convert-image` — `sharp`
+- `POST /api/translate-pdf/html` — splits the PDF into single pages (`pdf-lib`), sends each page's raw bytes to Gemini multimodal (`lib/gemini.ts`) with a vision prompt that returns translated HTML directly (no separate layout-extraction step — simplified vs. the old Python `html_extractor.py` heuristics). Runs with a small concurrency pool (4 at a time).
+- `POST /api/translate-pdf/download-pdf`, `POST /api/word-to-pdf` — render HTML → PDF via `lib/htmlToPdf.ts` (puppeteer-core + `@sparticuz/chromium` on Vercel/Lambda, full `puppeteer` locally — branches on `process.env.VERCEL`/`AWS_LAMBDA_FUNCTION_NAME`)
+- `POST /api/translate-pdf/download-edited-docx` — parses translated HTML with `cheerio` and builds a `.docx` via the `docx` package (`lib/htmlToDocx.ts`)
+- `POST /api/pdf-to-word` — `pdfjs-dist` text-content extraction grouped into lines/paragraphs (`lib/pdfToDocx.ts`); scanned pages (little/no extractable text) fall back to Gemini Vision OCR (`lib/ocr.ts`) instead of Tesseract. No table/image extraction (simplified vs. the old Python block parser).
 
-### Translation Pipeline (`backend/services/translation/`)
+### Components (`components/`)
+Ports of the original Workspace components (`MergeWorkspace`, `SplitWorkspace`, `CompressWorkspace`, `TranslateWorkspace`, `PdfToWordWorkspace`, `PdfToImageWorkspace`, `WordToPdfWorkspace`, `ImageConvertWorkspace`, `MergeResult`, `PdfRenderer`, `Sidebar`). `TranslateWorkspace` keeps the original two-panel bilingual editor (contentEditable HTML panel + original PDF viewer via `react-pdf`).
 
-Two parallel translation pipelines:
+### Known simplifications vs. the old Python backend
+- No structured/block translation pipeline or glossary system — HTML-via-Gemini only.
+- `pdf-to-word` has no table detection or embedded-image extraction (paragraphs only).
+- Stub tools (`read`, `protect`, `sign`, `edit`) and the unused `docx-preview` dependency were dropped — they were non-functional in the old frontend too.
 
-**1. Structured/block pipeline** (`extractor.py` → `engine.py` → `docx_builder.py`):
-- `extractor.py`: Uses PyMuPDF (`fitz`) to extract text blocks and tables per page with layout metadata (bbox, font size, bold, alignment, heading detection)
-- `engine.py`: Orchestrates translation — detects doc type, loads glossary, translates blocks concurrently (up to 8 workers). Primary translator: Gemini (`gemini-3.5-flash`). Fallbacks: DeepL → Google Translate. Birth certificates get special template-based translation via `template_translator.py`.
-- `docx_builder.py`: Builds `.docx` from translated blocks, preserving formatting
-
-**2. HTML pipeline** (`html_extractor.py` → `html_translator.py`):
-- `html_extractor.py`: Converts PDF pages to structured HTML preserving visual layout
-- `html_translator.py`: Sends HTML to Gemini with instructions to translate text while preserving all tags/styles. Handles scanned (image) PDFs via OCR path. Scanned pages are paired together (2 at a time) for better form reconstruction. Translation runs 4 pages in parallel.
-
-**Document type detection** (`document_detector.py`): Classifies PDFs into types (`birth_cert`, `marriage_cert`, `school_transcript`, `employment`, `consular`, `general_legal`) based on keyword matching.
-
-**Glossaries** (`glossaries/`): Each doc type has a glossary of Vietnamese→English term mappings. `engine.py` passes these as context to Gemini or uses placeholder substitution for DeepL/Google.
-
-### Frontend (`frontend/src/`)
-
-React SPA with React Router. Routes:
-- `/` → `Home` page (tool grid)
-- `/tool/:toolId` → `ToolPage` (dispatches to the appropriate Workspace component)
-
-**Workspace components** each handle one tool's full UI lifecycle: file upload → API call → result display/download. `TranslateWorkspace` has a two-mode UI (HTML pipeline preferred, bilingual side-by-side view).
-
-`ToolPage` owns the initial file drop/select state and passes `initialFiles` to the active Workspace. The `translate` tool bypasses this — `TranslateWorkspace` manages its own file input.
-
-### PDF processing libraries
-- `PyMuPDF` (`fitz`) — PDF parsing, rendering, splitting, merging
-- `pypdf` / `pikepdf` — used in compressor and merger services
-- `python-docx` — DOCX building
-- `WeasyPrint` — HTML→PDF rendering
-- `docx2pdf` — Word→PDF conversion (requires LibreOffice or MS Word on host)
-- `deep-translator` — Google Translate free fallback
-- `deepl` — optional DeepL API client
+### PDF/document libraries
+- `pdf-lib` — structural PDF ops (merge/split/rotate/embed images)
+- `pdfjs-dist` (legacy build) + `@napi-rs/canvas` — server-side PDF rasterization
+- `sharp` — image format conversion
+- `docx` — DOCX building; `mammoth` — DOCX → HTML (for word-to-pdf)
+- `puppeteer-core` / `puppeteer` + `@sparticuz/chromium` — HTML → PDF rendering
+- `@google/genai` — Gemini calls (translation + OCR)
+- `react-pdf` — client-side PDF thumbnails/preview
