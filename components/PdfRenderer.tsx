@@ -26,10 +26,20 @@ export default function PdfRenderer({
   width,
 }: PdfRendererProps) {
   const [, setNumPages] = useState<number | null>(null);
+  // The page's own /Rotate value (e.g. a scanned doc saved sideways). The
+  // backend adds the user's rotation on top of this, so the preview must
+  // combine them the same way — otherwise clicking "rotate" can look like
+  // it does nothing (or the wrong turn) while the exported file rotates
+  // from a different starting point.
+  const [nativeRotation, setNativeRotation] = useState(0);
 
   const onLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
     if (onDocumentLoad) onDocumentLoad(numPages);
+  };
+
+  const onPageLoadSuccess = (page: { rotate: number }) => {
+    setNativeRotation(page.rotate || 0);
   };
 
   const onLoadError = (err: Error) => {
@@ -81,8 +91,9 @@ export default function PdfRenderer({
       <Page
         pageNumber={pageNum}
         scale={scale}
-        rotate={rotation}
+        rotate={(nativeRotation + rotation) % 360}
         width={width}
+        onLoadSuccess={onPageLoadSuccess}
         renderAnnotationLayer={false}
         renderTextLayer={false}
       />

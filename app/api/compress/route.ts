@@ -29,7 +29,11 @@ export async function POST(req: NextRequest) {
 
     for (let i = 1; i <= numPages; i++) {
       const page = await pdfDoc.getPage(i);
-      const [pw, ph] = [page.view[2] - page.view[0], page.view[3] - page.view[1]];
+      // Use the rotation-aware viewport (not the raw mediabox) so the output
+      // page matches the rendered image's orientation — page.view ignores
+      // the page's /Rotate, but getViewport swaps width/height for 90°/270°.
+      const baseViewport = page.getViewport({ scale: 1 });
+      const [pw, ph] = [baseViewport.width, baseViewport.height];
       const { buffer } = await renderPageToJpeg(pdfDoc, i, zoom, quality);
       const jpgImage = await outPdf.embedJpg(buffer);
       const newPage = outPdf.addPage([pw, ph]);
