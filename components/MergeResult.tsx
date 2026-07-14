@@ -15,7 +15,7 @@ import {
   Loader2,
 } from "lucide-react";
 
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 type MergeResultProps = {
   blob: Blob;
