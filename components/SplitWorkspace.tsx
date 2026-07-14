@@ -117,19 +117,24 @@ export default function SplitWorkspace({ initialFiles, onCancel }: SplitWorkspac
 
     setIsExporting(true);
     try {
-      const manifest = kept.map((p) => ({ file_index: 0, page: p.pageNum, rotation: p.rotation || 0 }));
-      const formData = new FormData();
-      formData.append("files", file, file.name);
-      formData.append("manifest", JSON.stringify(manifest));
-      const base = file.name.replace(/\.pdf$/i, "");
-      formData.append("output_name", base);
+      // Process in-browser — avoids Vercel 4.5MB upload limit
+      const { PDFDocument, degrees } = await import("pdf-lib");
+      const bytes = await file.arrayBuffer();
+      const src = await PDFDocument.load(bytes);
+      const result = await PDFDocument.create();
 
-      const res = await fetch(`/api/merge-pages`, { method: "POST", body: formData });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: "Lỗi không xác định" }));
-        throw new Error(err.detail);
+      for (const p of kept) {
+        const pageIdx = p.pageNum - 1;
+        if (pageIdx < 0 || pageIdx >= src.getPageCount()) continue;
+        const [copied] = await result.copyPages(src, [pageIdx]);
+        const rot = ((p.rotation || 0) % 360 + 360) % 360;
+        if (rot) copied.setRotation(degrees((copied.getRotation().angle + rot) % 360));
+        result.addPage(copied);
       }
-      const blob = await res.blob();
+
+      const outBytes = await result.save();
+      const blob = new Blob([outBytes.buffer as ArrayBuffer], { type: "application/pdf" });
+      const base = file.name.replace(/\.pdf$/i, "");
       setResult({ blob, name: base });
     } catch (e) {
       setError(`Cắt PDF thất bại: ${(e as Error).message}`);

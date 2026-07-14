@@ -239,44 +239,44 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
 
     setIsMerging(true);
     try {
-      let blob: Blob;
+      // Process entirely in-browser using pdf-lib — no upload, no 4.5MB Vercel limit
+      const { PDFDocument, degrees } = await import("pdf-lib");
+      const result = await PDFDocument.create();
 
       if (viewMode === "files") {
-        const formData = new FormData();
-        files.forEach((f) => formData.append("files", f.file, f.name + "." + f.extension));
-        formData.append("rotations", JSON.stringify(files.map((f) => f.rotation || 0)));
-        formData.append("output_name", files[0]?.name || "merged");
-        const res = await fetch(`/api/merge`, { method: "POST", body: formData });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ detail: "Lỗi không xác định" }));
-          throw new Error(err.detail);
+        for (const f of files) {
+          const bytes = await f.file.arrayBuffer();
+          const src = await PDFDocument.load(bytes);
+          const copied = await result.copyPages(src, src.getPageIndices());
+          const rot = ((f.rotation || 0) % 360 + 360) % 360;
+          copied.forEach((page) => {
+            if (rot) page.setRotation(degrees((page.getRotation().angle + rot) % 360));
+            result.addPage(page);
+          });
         }
-        blob = await res.blob();
       } else {
         const selectedPages = pages.filter((p) => p.selected);
-        const uniqueFileIds = [...new Set(selectedPages.map((p) => p.fileId))];
-        const uniqueFiles = uniqueFileIds.map((id) => files.find((f) => f.id === id)).filter(Boolean) as FileItem[];
-        const fileIdToIdx = Object.fromEntries(uniqueFiles.map((f, i) => [f.id, i]));
-
-        const manifest = selectedPages.map((p) => ({
-          file_index: fileIdToIdx[p.fileId],
-          page: p.pageNum,
-          rotation: p.rotation || 0,
-        }));
-
-        const formData = new FormData();
-        uniqueFiles.forEach((f) => formData.append("files", f.file, f.name + "." + f.extension));
-        formData.append("manifest", JSON.stringify(manifest));
-        formData.append("output_name", uniqueFiles[0]?.name || "merged");
-
-        const res = await fetch(`/api/merge-pages`, { method: "POST", body: formData });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ detail: "Lỗi không xác định" }));
-          throw new Error(err.detail);
+        // Load each unique source file once
+        const fileCache = new Map<string, ReturnType<typeof PDFDocument.load> extends Promise<infer T> ? T : never>();
+        for (const p of selectedPages) {
+          if (!fileCache.has(p.fileId)) {
+            const bytes = await p.fileObj.arrayBuffer();
+            fileCache.set(p.fileId, await PDFDocument.load(bytes));
+          }
         }
-        blob = await res.blob();
+        for (const p of selectedPages) {
+          const src = fileCache.get(p.fileId)!;
+          const pageIdx = p.pageNum - 1;
+          if (pageIdx < 0 || pageIdx >= src.getPageCount()) continue;
+          const [copied] = await result.copyPages(src, [pageIdx]);
+          const rot = ((p.rotation || 0) % 360 + 360) % 360;
+          if (rot) copied.setRotation(degrees((copied.getRotation().angle + rot) % 360));
+          result.addPage(copied);
+        }
       }
 
+      const outBytes = await result.save();
+      const blob = new Blob([outBytes.buffer as ArrayBuffer], { type: "application/pdf" });
       const defaultName =
         (viewMode === "files" ? files[0]?.name : pages.find((p) => p.selected)?.fileName) || "merged";
       setMergeResult({ blob, name: defaultName });
