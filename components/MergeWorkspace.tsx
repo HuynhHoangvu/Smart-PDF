@@ -106,6 +106,7 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
   const [mergeError, setMergeError] = useState<string | null>(null);
   const [mergeResult, setMergeResult] = useState<{ blob: Blob; name: string } | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [normalizeToA4, setNormalizeToA4] = useState(false);
 
   const enterPageView = () => {
     setPages(buildPageList(files));
@@ -293,6 +294,19 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
       const { PDFDocument, degrees } = await import("pdf-lib");
       const result = await PDFDocument.create();
 
+      // Scale a page to A4, preserving its orientation (portrait→A4 portrait, landscape→A4 landscape)
+      const applyA4 = (page: Awaited<ReturnType<typeof PDFDocument.load>>["getPage"] extends (n: number) => infer P ? P : never) => {
+        const A4_W = 595.28, A4_H = 841.89;
+        const w = page.getWidth(), h = page.getHeight();
+        const [tW, tH] = w > h ? [A4_H, A4_W] : [A4_W, A4_H];
+        const scale = Math.min(tW / w, tH / h);
+        const ox = (tW - w * scale) / 2;
+        const oy = (tH - h * scale) / 2;
+        page.setSize(tW, tH);
+        page.scaleContent(scale, scale);
+        page.translateContent(ox, oy);
+      };
+
       if (viewMode === "files") {
         for (const f of files) {
           const bytes = await f.file.arrayBuffer();
@@ -302,6 +316,7 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
           copied.forEach((page) => {
             if (rot) page.setRotation(degrees((page.getRotation().angle + rot) % 360));
             result.addPage(page);
+            if (normalizeToA4) applyA4(page);
           });
         }
       } else {
@@ -322,6 +337,7 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
           const rot = ((p.rotation || 0) % 360 + 360) % 360;
           if (rot) copied.setRotation(degrees((copied.getRotation().angle + rot) % 360));
           result.addPage(copied);
+          if (normalizeToA4) applyA4(copied);
         }
       }
 
@@ -444,7 +460,11 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
             <input type="checkbox" checked={files.length > 0 && files.every((f) => f.selected)} onChange={selectAllFiles} />
             <span>Chọn tất cả ({files.length} file)</span>
           </label>
-          <div className="sub-toolbar-actions">
+          <div className="sub-toolbar-actions" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <label className="select-all-label" style={{ fontSize: 13, color: "#4a5568" }}>
+              <input type="checkbox" checked={normalizeToA4} onChange={(e) => setNormalizeToA4(e.target.checked)} />
+              <span>Chuẩn hóa kích thước A4</span>
+            </label>
             <button className="toolbar-icon-btn active">
               <Grid size={15} />
             </button>
