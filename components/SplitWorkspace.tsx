@@ -130,7 +130,7 @@ export default function SplitWorkspace({ initialFiles, onCancel }: SplitWorkspac
         throw new Error(err.detail);
       }
       const blob = await res.blob();
-      setResult({ blob, name: `${base}_cat` });
+      setResult({ blob, name: base });
     } catch (e) {
       setError(`Cắt PDF thất bại: ${(e as Error).message}`);
     } finally {

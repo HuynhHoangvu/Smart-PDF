@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Plus,
   Trash2,
@@ -102,7 +102,10 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
     const onDrop = (e: DragEvent) => {
       e.preventDefault();
       setIsGlobalDragging(false);
-      if (e.dataTransfer?.files?.length) addRawFiles(Array.from(e.dataTransfer.files));
+      if (e.dataTransfer?.files?.length) {
+        const pdfs = Array.from(e.dataTransfer.files).filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
+        if (pdfs.length) addRawFiles(pdfs);
+      }
     };
     window.addEventListener("dragover", onOver);
     window.addEventListener("dragleave", onLeave);
@@ -115,25 +118,34 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const addRawFiles = (rawFiles: File[]) => {
-    setFiles((prev) => [
-      ...prev,
-      ...rawFiles.map((file, i) => ({
-        id: `file-${Date.now()}-${i}`,
-        file,
-        name: file.name.replace(/\.[^/.]+$/, ""),
-        extension: file.name.split(".").pop() || "pdf",
-        selected: false,
-        rotation: 0,
-        pages: 1,
-      })),
-    ]);
+  const [insertAfterIdx, setInsertAfterIdx] = useState<number | null>(null);
+
+  const addRawFiles = (rawFiles: File[], afterIdx?: number) => {
+    const newItems = rawFiles.map((file, i) => ({
+      id: `file-${Date.now()}-${i}`,
+      file,
+      name: file.name.replace(/\.[^/.]+$/, ""),
+      extension: file.name.split(".").pop() || "pdf",
+      selected: false,
+      rotation: 0,
+      pages: 1,
+    }));
+    setFiles((prev) => {
+      if (afterIdx != null && afterIdx >= 0 && afterIdx < prev.length) {
+        const arr = [...prev];
+        arr.splice(afterIdx + 1, 0, ...newItems);
+        return arr;
+      }
+      return [...prev, ...newItems];
+    });
+    setInsertAfterIdx(null);
     if (viewMode === "pages") setViewMode("files");
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.length) addRawFiles(Array.from(e.target.files));
+    if (e.target.files?.length) addRawFiles(Array.from(e.target.files), insertAfterIdx ?? undefined);
     e.target.value = "";
+    setInsertAfterIdx(null);
   };
 
   const handleNameChange = (id: string, newName: string) =>
@@ -301,7 +313,7 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
           <ListIcon size={15} style={{ marginRight: 5 }} /> Trang
         </button>
         <div className="toolbar-divider" />
-        <button className="toolbar-btn" onClick={() => document.getElementById("add-more-input")?.click()}>
+        <button className="toolbar-btn" onClick={() => { setInsertAfterIdx(null); document.getElementById("add-more-input")?.click(); }}>
           <Plus size={15} style={{ marginRight: 4 }} /> Thêm <ChevronDown size={13} />
         </button>
         <input id="add-more-input" type="file" multiple hidden accept=".pdf" onChange={handleFileInput} />
@@ -399,8 +411,8 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
 
       {viewMode === "files" && (
         <div className="workspace-grid">
-          {files.map((f) => (
-            <Fragment key={f.id}>
+          {files.map((f, fileIdx) => (
+            <div key={f.id} style={{ display: "contents" }}>
               <div
                 className={`file-card ${f.selected ? "selected" : ""}`}
                 draggable
@@ -449,19 +461,24 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
                   <div className="file-pages">{f.pages} trang</div>
                 </div>
               </div>
-              <div className="insert-plus" onClick={() => document.getElementById("add-more-input")?.click()}>
+              <div
+                className="insert-plus"
+                title="Thêm file vào đây"
+                onClick={() => {
+                  setInsertAfterIdx(fileIdx);
+                  document.getElementById("add-more-input")?.click();
+                }}
+              >
                 <Plus size={13} />
               </div>
-            </Fragment>
+            </div>
           ))}
           <div className="add-more-card" onClick={() => document.getElementById("add-more-input")?.click()}>
             <div className="add-icon">
               <Plus size={20} />
             </div>
             <div>
-              Thêm các file PDF,
-              <br />
-              hình ảnh, Word, Excel...
+              Thêm file PDF
             </div>
           </div>
         </div>
@@ -470,51 +487,47 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
       {viewMode === "pages" && (
         <div className="workspace-grid pages-grid">
           {pages.map((p) => (
-            <Fragment key={p.id}>
-              <div
-                className={`page-card ${p.selected ? "" : "page-deselected"}`}
-                draggable
-                onDragStart={(e) => pageCardHandlers.onDragStart(e, p.id)}
-                onDragOver={pageCardHandlers.onDragOver}
-                onDrop={(e) => pageCardHandlers.onDrop(e, p.id)}
-              >
-                <input type="checkbox" className="file-checkbox" checked={p.selected} onChange={() => toggleSelectPage(p.id)} />
-                <div className="file-preview">
-                  <div className="card-hover-overlay">
-                    <button
-                      className="overlay-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        rotatePageItem(p.id, 90);
-                      }}
-                    >
-                      <RotateCw size={13} />
-                    </button>
-                    <button
-                      className="overlay-btn delete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deletePageItem(p.id);
-                      }}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                  <div className="file-preview-content">
-                    <PdfRenderer file={p.fileObj} pageNum={p.pageNum} width={110} rotation={p.rotation} />
-                  </div>
+            <div
+              key={p.id}
+              className={`page-card ${p.selected ? "" : "page-deselected"}`}
+              draggable
+              onDragStart={(e) => pageCardHandlers.onDragStart(e, p.id)}
+              onDragOver={pageCardHandlers.onDragOver}
+              onDrop={(e) => pageCardHandlers.onDrop(e, p.id)}
+            >
+              <input type="checkbox" className="file-checkbox" checked={p.selected} onChange={() => toggleSelectPage(p.id)} />
+              <div className="file-preview">
+                <div className="card-hover-overlay">
+                  <button
+                    className="overlay-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      rotatePageItem(p.id, 90);
+                    }}
+                  >
+                    <RotateCw size={13} />
+                  </button>
+                  <button
+                    className="overlay-btn delete"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deletePageItem(p.id);
+                    }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
                 </div>
-                <div className="file-info">
-                  <div className="page-source-name" title={p.fileName}>
-                    {p.fileName}
-                  </div>
-                  <div className="page-num-badge">{p.pageNum}</div>
+                <div className="file-preview-content">
+                  <PdfRenderer file={p.fileObj} pageNum={p.pageNum} width={110} rotation={p.rotation} />
                 </div>
               </div>
-              <div className="insert-plus">
-                <Plus size={13} />
+              <div className="file-info">
+                <div className="page-source-name" title={p.fileName}>
+                  {p.fileName}
+                </div>
+                <div className="page-num-badge">{p.pageNum}</div>
               </div>
-            </Fragment>
+            </div>
           ))}
         </div>
       )}

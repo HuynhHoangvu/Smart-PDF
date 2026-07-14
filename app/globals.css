@@ -1227,7 +1227,7 @@ a {
 .translated-page-content table {
   width: 100% !important;
   max-width: 100% !important;
-  table-layout: fixed !important;
+  table-layout: auto !important;
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
@@ -1235,7 +1235,6 @@ a {
 .translated-page-content th {
   word-wrap: break-word;
   overflow-wrap: break-word;
-  max-width: 0;
 }
 .translated-block {
   color: #1a202c;
