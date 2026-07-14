@@ -10,7 +10,8 @@ type PageItem = {
   pageNum: number;
   kept: boolean;
   checked: boolean;
-  rotation: number;
+  builtInRotation: number;
+  rotation: number; // user-applied delta
 };
 
 type SplitWorkspaceProps = {
@@ -48,7 +49,8 @@ export default function SplitWorkspace({ initialFiles, onCancel }: SplitWorkspac
         pageNum: i + 1,
         kept: true,
         checked: false,
-        rotation: rotations[i] ?? 0,
+        builtInRotation: rotations[i] ?? 0,
+        rotation: 0,
       }))
     );
   };
@@ -286,7 +288,7 @@ export default function SplitWorkspace({ initialFiles, onCancel }: SplitWorkspac
                 )}
               </div>
               <div className="file-preview-content">
-                <PdfRenderer file={fileUrl!} pageNum={p.pageNum} width={110} rotation={p.rotation} />
+                <PdfRenderer file={fileUrl!} pageNum={p.pageNum} width={110} rotation={(p.builtInRotation + p.rotation) % 360} />
               </div>
             </div>
             <div className="file-info">
@@ -310,7 +312,7 @@ export default function SplitWorkspace({ initialFiles, onCancel }: SplitWorkspac
             </div>
             <div className="preview-modal-body">
               <div className="pdf-view-wrapper">
-                <PdfRenderer file={fileUrl!} pageNum={previewPage} width={500} rotation={previewPageItem?.rotation || 0} />
+                <PdfRenderer file={fileUrl!} pageNum={previewPage} width={500} rotation={previewPageItem ? (previewPageItem.builtInRotation + previewPageItem.rotation) % 360 : 0} />
               </div>
             </div>
             <div className="preview-modal-footer">
