@@ -16,7 +16,6 @@ export default function WordToPdfWorkspace({ initialFiles, onCancel }: WordToPdf
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultFilename, setResultFilename] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const hasStarted = useRef(false);
 
   const isWord = file && /\.(docx?|doc)$/i.test(file.name);
 
@@ -28,32 +27,20 @@ export default function WordToPdfWorkspace({ initialFiles, onCancel }: WordToPdf
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   };
 
-  const handleFile = (f: File | null) => {
-    setFile(f);
-    setStatus("idle");
-    setError("");
-    setResultBlob(null);
-    if (resultUrl) {
-      URL.revokeObjectURL(resultUrl);
-      setResultUrl(null);
-    }
-    hasStarted.current = false;
-  };
-
-  const convert = async () => {
-    if (!file || !isWord) return;
+  const convert = async (f: File = file!) => {
+    if (!f || !/\.(docx?|doc)$/i.test(f.name)) return;
     setStatus("loading");
     setError("");
     try {
       const form = new FormData();
-      form.append("file", file);
+      form.append("file", f);
       const res = await fetch(`/api/word-to-pdf`, { method: "POST", body: form });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || "Lỗi chuyển đổi");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       setResultBlob(blob);
       setResultUrl(url);
-      setResultFilename(file.name.replace(/\.(docx?|doc)$/i, "") + ".pdf");
+      setResultFilename(f.name.replace(/\.(docx?|doc)$/i, "") + ".pdf");
       setStatus("done");
     } catch (e) {
       setError((e as Error).message);
@@ -61,21 +48,26 @@ export default function WordToPdfWorkspace({ initialFiles, onCancel }: WordToPdf
     }
   };
 
+  // Auto-start conversion when a file is provided on mount
   useEffect(() => {
-    if (file && isWord && status === "idle" && !hasStarted.current) {
-      hasStarted.current = true;
-      convert();
-    }
-    return () => {
-      if (resultUrl) URL.revokeObjectURL(resultUrl);
-    };
+    if (file && isWord) convert(file);
+    return () => { if (resultUrl) URL.revokeObjectURL(resultUrl); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const handleFile = (f: File | null) => {
+    if (resultUrl) URL.revokeObjectURL(resultUrl);
+    setFile(f);
+    setStatus("idle");
+    setError("");
+    setResultBlob(null);
+    setResultUrl(null);
+  };
+
   const download = () => {
-    if (!resultBlob) return;
+    if (!resultUrl) return;
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(resultBlob);
+    a.href = resultUrl;
     a.download = resultFilename;
     a.click();
   };
@@ -121,14 +113,7 @@ export default function WordToPdfWorkspace({ initialFiles, onCancel }: WordToPdf
         <h3 style={{ fontSize: 18, fontWeight: 600, color: "#e53e3e", marginBottom: 8 }}>Chuyển đổi thất bại</h3>
         <p style={{ fontSize: 13, color: "#4a5568", marginBottom: 24 }}>{error}</p>
         <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-          <button
-            className="btn btn-primary"
-            style={{ display: "flex", alignItems: "center", gap: 6 }}
-            onClick={() => {
-              hasStarted.current = false;
-              convert();
-            }}
-          >
+          <button className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={() => convert()}>
             <RefreshCw size={15} /> Thử lại
           </button>
           <button className="btn btn-outline" onClick={onCancel}>
@@ -213,7 +198,7 @@ export default function WordToPdfWorkspace({ initialFiles, onCancel }: WordToPdf
         File: <strong style={{ color: "#4a5568" }}>{file.name}</strong> ({formatSize(file.size)})
       </p>
       <div style={{ display: "flex", gap: 12, justifyContent: "center", marginBottom: 16 }}>
-        <button className="btn btn-primary" style={{ padding: "10px 28px", fontSize: 14 }} onClick={convert}>
+        <button className="btn btn-primary" style={{ padding: "10px 28px", fontSize: 14 }} onClick={() => convert()}>
           Chuyển đổi ngay
         </button>
         <button className="btn btn-outline" style={{ padding: "10px 20px", fontSize: 14 }} onClick={() => inputRef.current?.click()}>

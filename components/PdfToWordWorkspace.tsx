@@ -7,7 +7,6 @@ export default function PdfToWordWorkspace() {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [progress, setProgress] = useState(0);
-  const [loadingStep, setLoadingStep] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [resultName, setResultName] = useState("");
@@ -32,19 +31,12 @@ export default function PdfToWordWorkspace() {
     setErrorMsg("");
 
     let p = 0;
-    const steps = [
-      { t: 20, msg: "Đang phân tích cấu trúc PDF..." },
-      { t: 50, msg: "Đang nhận diện bảng biểu và định dạng..." },
-      { t: 80, msg: "Đang tạo file Word..." },
-      { t: 98, msg: "Hoàn thiện tài liệu..." },
-    ];
     const timer = setInterval(() => {
       if (p < 25) p += Math.floor(Math.random() * 6) + 4;
       else if (p < 70) p += Math.floor(Math.random() * 3) + 1;
       else if (p < 97) p += 1;
       if (p > 97) p = 97;
       setProgress(p);
-      setLoadingStep((steps.find((s) => p < s.t) || steps[3]).msg);
     }, 200);
 
     try {
@@ -139,7 +131,12 @@ export default function PdfToWordWorkspace() {
       </div>
     );
 
-  if (status === "loading")
+  if (status === "loading") {
+    const loadingStep =
+      progress < 20 ? "Đang phân tích cấu trúc PDF..." :
+      progress < 50 ? "Đang nhận diện bảng biểu và định dạng..." :
+      progress < 80 ? "Đang tạo file Word..." :
+      "Hoàn thiện tài liệu...";
     return (
       <div style={{ maxWidth: 500, margin: "80px auto", padding: 36, background: "#fff", borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", textAlign: "center" }}>
         <Loader2 size={44} style={{ color: "#0062ff", margin: "0 auto 20px", display: "block", animation: "spin 1.5s linear infinite" }} />
@@ -154,6 +151,7 @@ export default function PdfToWordWorkspace() {
         </div>
       </div>
     );
+  }
 
   if (status === "error")
     return (

@@ -223,7 +223,7 @@ export default function TranslateWorkspace() {
     });
     observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, [file, status]);
+  }, []);
 
   const fetchTranslation = async (f: File) => {
     setStatus("loading");
@@ -278,11 +278,11 @@ export default function TranslateWorkspace() {
     }
   };
 
-  const handleFile = useCallback(async (f: File) => {
+  const handleFile = useCallback((f: File) => {
     setFile(f);
     setObjectUrl(URL.createObjectURL(f));
     setResult(null);
-    await fetchTranslation(f);
+    fetchTranslation(f);
   }, []);
 
   const handleReset = () => {
@@ -295,15 +295,15 @@ export default function TranslateWorkspace() {
 
   const downloadTranslation = () => {
     if (!result) return;
-    const isHtmlModeLocal = result.mode === "html";
+    const htmlMode = result.mode === "html";
     let text = `BILINGUAL TRANSLATION — ${result.original_filename}\n`;
-    if (!isHtmlModeLocal) {
+    if (!htmlMode) {
       text += `Document type: ${result.doc_type_label}  |  Translator: ${(result.translator || "gemini").toUpperCase()}\n`;
     }
     text += "=".repeat(70) + "\n\n";
     result.pages.forEach((page) => {
       text += `--- Page ${page.page_num} ---\n\n`;
-      if (isHtmlModeLocal) {
+      if (htmlMode) {
         const tmp = document.createElement("div");
         const el = translatedPageRefs.current[page.page_num];
         tmp.innerHTML = el ? el.innerHTML : page.translated_html || "";
@@ -334,19 +334,25 @@ export default function TranslateWorkspace() {
     if (!result) return;
     setResult((prev) => {
       if (!prev) return prev;
-      const nextResult: TranslationResult = JSON.parse(JSON.stringify(prev));
-      const page = nextResult.pages.find((p) => p.page_num === pageNum);
-      if (page) {
-        const block = page.blocks?.[blockIdx];
-        if (block) {
-          if (block.type === "table" && rIdx !== undefined && cIdx !== undefined && block.translated_cells) {
-            block.translated_cells[rIdx][cIdx] = newText;
-          } else {
-            block.translated = newText;
-          }
-        }
-      }
-      return nextResult;
+      return {
+        ...prev,
+        pages: prev.pages.map((p) => {
+          if (p.page_num !== pageNum) return p;
+          const blocks = (p.blocks || []).map((b, i) => {
+            if (i !== blockIdx) return b;
+            if (b.type === "table" && rIdx !== undefined && cIdx !== undefined && b.translated_cells) {
+              return {
+                ...b,
+                translated_cells: b.translated_cells.map((row, ri) =>
+                  ri === rIdx ? row.map((cell, ci) => (ci === cIdx ? newText : cell)) : row
+                ),
+              };
+            }
+            return { ...b, translated: newText };
+          });
+          return { ...p, blocks };
+        }),
+      };
     });
   };
 
@@ -361,12 +367,10 @@ export default function TranslateWorkspace() {
   const handleHtmlEdit = (pageNum: number, newHtml: string) => {
     setResult((prev) => {
       if (!prev) return prev;
-      const nextResult: TranslationResult = JSON.parse(JSON.stringify(prev));
-      const targetPage = nextResult.pages.find((p) => p.page_num === pageNum);
-      if (targetPage) {
-        targetPage.translated_html = newHtml;
-      }
-      return nextResult;
+      return {
+        ...prev,
+        pages: prev.pages.map((p) => (p.page_num === pageNum ? { ...p, translated_html: newHtml } : p)),
+      };
     });
   };
 
@@ -393,14 +397,18 @@ export default function TranslateWorkspace() {
     }
   };
 
+  const mergeRefsIntoResult = (): TranslationResult => ({
+    ...result!,
+    pages: result!.pages.map((p) => {
+      const el = translatedPageRefs.current[p.page_num];
+      return el ? { ...p, translated_html: el.innerHTML } : p;
+    }),
+  });
+
   const downloadPdf = async () => {
     if (!result) return;
     try {
-      const mergedResult: TranslationResult = JSON.parse(JSON.stringify(result));
-      Object.entries(translatedPageRefs.current).forEach(([pageNum, el]) => {
-        const page = mergedResult.pages?.find((p) => p.page_num === Number(pageNum));
-        if (page && el) page.translated_html = el.innerHTML;
-      });
+      const mergedResult = mergeRefsIntoResult();
       const res = await fetch(`/api/translate-pdf/download-pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -420,20 +428,7 @@ export default function TranslateWorkspace() {
   const downloadDocx = async () => {
     if (!result) return;
     try {
-      const htmlPages = Object.entries(translatedPageRefs.current).map(([pageNum, el]) => ({
-        page_num: Number(pageNum),
-        translated_html: el?.innerHTML || "",
-      }));
-
-      const mergedResult: TranslationResult = JSON.parse(JSON.stringify(result));
-      if (htmlPages.length > 0) {
-        htmlPages.forEach(({ page_num, translated_html }) => {
-          const page = mergedResult.pages?.find((p) => p.page_num === page_num);
-          if (page) {
-            page.translated_html = translated_html;
-          }
-        });
-      }
+      const mergedResult = mergeRefsIntoResult();
 
       const res = await fetch(`/api/translate-pdf/download-edited-docx`, {
         method: "POST",
