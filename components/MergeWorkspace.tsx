@@ -63,6 +63,7 @@ type MergeWorkspaceProps = {
 
 export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspaceProps) {
   const [viewMode, setViewMode] = useState<"files" | "pages">("files");
+  // Start with rotation:0 placeholder; useEffect will update with actual PDF rotation
   const [files, setFiles] = useState<FileItem[]>(
     initialFiles.map((file, index) => ({
       id: `file-${Date.now()}-${index}`,
@@ -74,6 +75,25 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
       pages: 1,
     }))
   );
+
+  useEffect(() => {
+    if (!initialFiles.length) return;
+    (async () => {
+      const { PDFDocument } = await import("pdf-lib");
+      const rotations = await Promise.all(
+        initialFiles.map(async (file) => {
+          try {
+            const doc = await PDFDocument.load(await file.arrayBuffer());
+            return doc.getPage(0).getRotation().angle;
+          } catch {
+            return 0;
+          }
+        })
+      );
+      setFiles((prev) => prev.map((f, i) => ({ ...f, rotation: rotations[i] ?? 0 })));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [pages, setPages] = useState<PageItem[]>([]);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [previewPage, setPreviewPage] = useState(1);
@@ -120,16 +140,26 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
 
   const [insertAfterIdx, setInsertAfterIdx] = useState<number | null>(null);
 
-  const addRawFiles = (rawFiles: File[], afterIdx?: number) => {
-    const newItems = rawFiles.map((file, i) => ({
-      id: `file-${Date.now()}-${i}`,
-      file,
-      name: file.name.replace(/\.[^/.]+$/, ""),
-      extension: file.name.split(".").pop() || "pdf",
-      selected: false,
-      rotation: 0,
-      pages: 1,
-    }));
+  const addRawFiles = async (rawFiles: File[], afterIdx?: number) => {
+    const { PDFDocument } = await import("pdf-lib");
+    const newItems = await Promise.all(
+      rawFiles.map(async (file, i) => {
+        let rotation = 0;
+        try {
+          const doc = await PDFDocument.load(await file.arrayBuffer());
+          rotation = doc.getPage(0).getRotation().angle;
+        } catch {}
+        return {
+          id: `file-${Date.now()}-${i}`,
+          file,
+          name: file.name.replace(/\.[^/.]+$/, ""),
+          extension: file.name.split(".").pop() || "pdf",
+          selected: false,
+          rotation,
+          pages: 1,
+        };
+      })
+    );
     setFiles((prev) => {
       if (afterIdx != null && afterIdx >= 0 && afterIdx < prev.length) {
         const arr = [...prev];

@@ -32,16 +32,23 @@ export default function SplitWorkspace({ initialFiles, onCancel }: SplitWorkspac
   const lastClickedRef = useRef<number | null>(null);
   const draggedIdRef = useRef<string | null>(null);
 
-  const onDocumentLoad = (count: number) => {
+  const onDocumentLoad = async (count: number) => {
     if (numPages) return;
     setNumPages(count);
+    // Read per-page rotations from pdf-lib so react-pdf renders them correctly
+    let rotations: number[] = Array(count).fill(0);
+    try {
+      const { PDFDocument } = await import("pdf-lib");
+      const doc = await PDFDocument.load(await file!.arrayBuffer());
+      rotations = doc.getPages().map((p) => p.getRotation().angle);
+    } catch {}
     setPages(
       Array.from({ length: count }, (_, i) => ({
         id: `page-${i + 1}`,
         pageNum: i + 1,
         kept: true,
         checked: false,
-        rotation: 0,
+        rotation: rotations[i] ?? 0,
       }))
     );
   };
