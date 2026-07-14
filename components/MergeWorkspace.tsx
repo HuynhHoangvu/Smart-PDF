@@ -108,9 +108,28 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [normalizeToA4, setNormalizeToA4] = useState(false);
 
-  const enterPageView = () => {
-    setPages(buildPageList(files));
+  const enterPageView = async () => {
+    // Show immediately with file-level rotation, then update per-page rotations async
+    const initial = buildPageList(files);
+    setPages(initial);
     setViewMode("pages");
+
+    try {
+      const { PDFDocument } = await import("pdf-lib");
+      const updated = [...initial];
+      for (const file of files) {
+        try {
+          const doc = await PDFDocument.load(await file.file.arrayBuffer());
+          const pdfPages = doc.getPages();
+          updated.forEach((p) => {
+            if (p.fileId === file.id && p.pageNum <= pdfPages.length) {
+              p.builtInRotation = pdfPages[p.pageNum - 1].getRotation().angle;
+            }
+          });
+        } catch {}
+      }
+      setPages([...updated]);
+    } catch {}
   };
 
   const enterFileView = () => setViewMode("files");
