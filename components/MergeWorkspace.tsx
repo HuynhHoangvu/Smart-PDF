@@ -25,8 +25,7 @@ type FileItem = {
   name: string;
   extension: string;
   selected: boolean;
-  builtInRotation: number; // from PDF metadata — preserved in output, never touched by user actions
-  rotation: number;        // user-applied additional rotation delta
+  rotation: number; // user-applied rotation delta (0 = no change, PDF shows at its natural rotation)
   pages: number;
 };
 
@@ -39,8 +38,7 @@ type PageItem = {
   extension: string;
   pageNum: number;
   selected: boolean;
-  builtInRotation: number;
-  rotation: number; // user-applied delta
+  rotation: number;
 };
 
 const buildPageList = (files: FileItem[]): PageItem[] =>
@@ -54,7 +52,6 @@ const buildPageList = (files: FileItem[]): PageItem[] =>
       extension: f.extension,
       pageNum: i + 1,
       selected: true,
-      builtInRotation: f.builtInRotation,
       rotation: f.rotation,
     }))
   );
@@ -73,31 +70,10 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
       name: file.name.replace(/\.[^/.]+$/, ""),
       extension: file.name.split(".").pop() || "pdf",
       selected: false,
-      builtInRotation: 0,
       rotation: 0,
       pages: 1,
     }))
   );
-
-  // Detect each file's built-in PDF rotation so previews render correctly
-  useEffect(() => {
-    if (!initialFiles.length) return;
-    (async () => {
-      const { PDFDocument } = await import("pdf-lib");
-      const builtIns = await Promise.all(
-        initialFiles.map(async (file) => {
-          try {
-            const doc = await PDFDocument.load(await file.arrayBuffer());
-            return doc.getPage(0).getRotation().angle;
-          } catch {
-            return 0;
-          }
-        })
-      );
-      setFiles((prev) => prev.map((f, i) => ({ ...f, builtInRotation: builtIns[i] ?? 0 })));
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   const [pages, setPages] = useState<PageItem[]>([]);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [previewPage, setPreviewPage] = useState(1);
@@ -108,28 +84,9 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [normalizeToA4, setNormalizeToA4] = useState(false);
 
-  const enterPageView = async () => {
-    // Show immediately with file-level rotation, then update per-page rotations async
-    const initial = buildPageList(files);
-    setPages(initial);
+  const enterPageView = () => {
+    setPages(buildPageList(files));
     setViewMode("pages");
-
-    try {
-      const { PDFDocument } = await import("pdf-lib");
-      const updated = [...initial];
-      for (const file of files) {
-        try {
-          const doc = await PDFDocument.load(await file.file.arrayBuffer());
-          const pdfPages = doc.getPages();
-          updated.forEach((p) => {
-            if (p.fileId === file.id && p.pageNum <= pdfPages.length) {
-              p.builtInRotation = pdfPages[p.pageNum - 1].getRotation().angle;
-            }
-          });
-        } catch {}
-      }
-      setPages([...updated]);
-    } catch {}
   };
 
   const enterFileView = () => setViewMode("files");
@@ -179,27 +136,16 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
 
   const [insertAfterIdx, setInsertAfterIdx] = useState<number | null>(null);
 
-  const addRawFiles = async (rawFiles: File[], afterIdx?: number) => {
-    const { PDFDocument } = await import("pdf-lib");
-    const newItems = await Promise.all(
-      rawFiles.map(async (file, i) => {
-        let builtInRotation = 0;
-        try {
-          const doc = await PDFDocument.load(await file.arrayBuffer());
-          builtInRotation = doc.getPage(0).getRotation().angle;
-        } catch {}
-        return {
-          id: `file-${Date.now()}-${i}`,
-          file,
-          name: file.name.replace(/\.[^/.]+$/, ""),
-          extension: file.name.split(".").pop() || "pdf",
-          selected: false,
-          builtInRotation,
-          rotation: 0,
-          pages: 1,
-        };
-      })
-    );
+  const addRawFiles = (rawFiles: File[], afterIdx?: number) => {
+    const newItems = rawFiles.map((file, i) => ({
+      id: `file-${Date.now()}-${i}`,
+      file,
+      name: file.name.replace(/\.[^/.]+$/, ""),
+      extension: file.name.split(".").pop() || "pdf",
+      selected: false,
+      rotation: 0,
+      pages: 1,
+    }));
     setFiles((prev) => {
       if (afterIdx != null && afterIdx >= 0 && afterIdx < prev.length) {
         const arr = [...prev];
@@ -542,7 +488,7 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
                     </button>
                   </div>
                   <div className="file-preview-content">
-                    <PdfRenderer file={f.file} pageNum={1} width={110} rotation={(f.builtInRotation + f.rotation) % 360} onDocumentLoad={(count) => updatePages(f.id, count)} />
+                    <PdfRenderer file={f.file} pageNum={1} width={110} rotation={f.rotation} onDocumentLoad={(count) => updatePages(f.id, count)} />
                   </div>
                 </div>
                 <div className="file-info">
@@ -607,7 +553,7 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
                   </button>
                 </div>
                 <div className="file-preview-content">
-                  <PdfRenderer file={p.fileObj} pageNum={p.pageNum} width={110} rotation={(p.builtInRotation + p.rotation) % 360} />
+                  <PdfRenderer file={p.fileObj} pageNum={p.pageNum} width={110} rotation={p.rotation} />
                 </div>
               </div>
               <div className="file-info">
@@ -638,7 +584,7 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
                   file={previewFile.file}
                   pageNum={previewPage}
                   width={500}
-                  rotation={(previewFile.builtInRotation + previewFile.rotation) % 360}
+                  rotation={previewFile.rotation}
                   onDocumentLoad={(count) => updatePages(previewFile.id, count)}
                 />
               </div>

@@ -10,8 +10,7 @@ type PageItem = {
   pageNum: number;
   kept: boolean;
   checked: boolean;
-  builtInRotation: number;
-  rotation: number; // user-applied delta
+  rotation: number;
 };
 
 type SplitWorkspaceProps = {
@@ -33,23 +32,15 @@ export default function SplitWorkspace({ initialFiles, onCancel }: SplitWorkspac
   const lastClickedRef = useRef<number | null>(null);
   const draggedIdRef = useRef<string | null>(null);
 
-  const onDocumentLoad = async (count: number) => {
+  const onDocumentLoad = (count: number) => {
     if (numPages) return;
     setNumPages(count);
-    // Read per-page rotations from pdf-lib so react-pdf renders them correctly
-    let rotations: number[] = Array(count).fill(0);
-    try {
-      const { PDFDocument } = await import("pdf-lib");
-      const doc = await PDFDocument.load(await file!.arrayBuffer());
-      rotations = doc.getPages().map((p) => p.getRotation().angle);
-    } catch {}
     setPages(
       Array.from({ length: count }, (_, i) => ({
         id: `page-${i + 1}`,
         pageNum: i + 1,
         kept: true,
         checked: false,
-        builtInRotation: rotations[i] ?? 0,
         rotation: 0,
       }))
     );
@@ -288,7 +279,7 @@ export default function SplitWorkspace({ initialFiles, onCancel }: SplitWorkspac
                 )}
               </div>
               <div className="file-preview-content">
-                <PdfRenderer file={fileUrl!} pageNum={p.pageNum} width={110} rotation={(p.builtInRotation + p.rotation) % 360} />
+                <PdfRenderer file={fileUrl!} pageNum={p.pageNum} width={110} rotation={p.rotation} />
               </div>
             </div>
             <div className="file-info">
@@ -312,7 +303,7 @@ export default function SplitWorkspace({ initialFiles, onCancel }: SplitWorkspac
             </div>
             <div className="preview-modal-body">
               <div className="pdf-view-wrapper">
-                <PdfRenderer file={fileUrl!} pageNum={previewPage} width={500} rotation={previewPageItem ? (previewPageItem.builtInRotation + previewPageItem.rotation) % 360 : 0} />
+                <PdfRenderer file={fileUrl!} pageNum={previewPage} width={500} rotation={previewPageItem?.rotation ?? 0} />
               </div>
             </div>
             <div className="preview-modal-footer">
