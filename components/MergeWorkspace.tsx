@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Plus,
   Trash2,
@@ -114,29 +114,44 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
 
   const enterFileView = () => setViewMode("files");
 
+  const dragCounter = useRef(0);
+
   useEffect(() => {
-    const onOver = (e: DragEvent) => {
-      e.preventDefault();
+    const isFileDrag = (e: DragEvent) => e.dataTransfer?.types.includes("Files") ?? false;
+
+    const onEnter = (e: DragEvent) => {
+      if (!isFileDrag(e)) return;
+      dragCounter.current++;
       setIsGlobalDragging(true);
     };
     const onLeave = (e: DragEvent) => {
-      e.preventDefault();
-      if (e.clientX === 0 && e.clientY === 0) setIsGlobalDragging(false);
+      if (!isFileDrag(e)) return;
+      dragCounter.current--;
+      if (dragCounter.current <= 0) {
+        dragCounter.current = 0;
+        setIsGlobalDragging(false);
+      }
+    };
+    const onOver = (e: DragEvent) => {
+      if (isFileDrag(e)) e.preventDefault();
     };
     const onDrop = (e: DragEvent) => {
       e.preventDefault();
+      dragCounter.current = 0;
       setIsGlobalDragging(false);
       if (e.dataTransfer?.files?.length) {
         const pdfs = Array.from(e.dataTransfer.files).filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
         if (pdfs.length) addRawFiles(pdfs);
       }
     };
-    window.addEventListener("dragover", onOver);
+    window.addEventListener("dragenter", onEnter);
     window.addEventListener("dragleave", onLeave);
+    window.addEventListener("dragover", onOver);
     window.addEventListener("drop", onDrop);
     return () => {
-      window.removeEventListener("dragover", onOver);
+      window.removeEventListener("dragenter", onEnter);
       window.removeEventListener("dragleave", onLeave);
+      window.removeEventListener("dragover", onOver);
       window.removeEventListener("drop", onDrop);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
