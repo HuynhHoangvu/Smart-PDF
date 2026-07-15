@@ -18,13 +18,28 @@ export async function POST(req: NextRequest) {
         const inputBytes = Buffer.from(await f.arrayBuffer());
         // failOn: "none" lets libvips recover from minor corruption/truncation
         // (common with images downloaded from chat apps) instead of throwing.
+        // .rotate() with no args auto-orients using the image's EXIF Orientation
+        // tag (then strips it) — phone/scanner photos are often stored "sideways"
+        // pixel-wise and only look upright because viewers honor that tag; without
+        // this, sharp re-encodes the raw (unrotated) pixels and the PDF page comes
+        // out rotated/mirrored compared to how the original file displays elsewhere.
         const jpegBytes = await sharp(inputBytes, { failOn: "none" })
+          .rotate()
           .flatten({ background: "#ffffff" })
           .jpeg({ quality: 92 })
           .toBuffer();
         const image = await pdf.embedJpg(jpegBytes);
-        const page = pdf.addPage([image.width, image.height]);
-        page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+        // A PDF page's [width, height] is in points (72/inch). Using the raw
+        // pixel count as the point size (the old behavior) makes the page
+        // physically huge — a 1236x1776px photo became a ~17x25in page — so
+        // the image only fills it at ~72 DPI and looks blurry/pixelated the
+        // moment you zoom in. Sizing the page from the pixel count at a
+        // normal print DPI keeps the full image resolution intact instead.
+        const DPI = 150;
+        const pageWidth = (image.width / DPI) * 72;
+        const pageHeight = (image.height / DPI) * 72;
+        const page = pdf.addPage([pageWidth, pageHeight]);
+        page.drawImage(image, { x: 0, y: 0, width: pageWidth, height: pageHeight });
       } catch (err) {
         console.error(`images-to-pdf: failed to process "${f.name}":`, err);
         failed.push(f.name);

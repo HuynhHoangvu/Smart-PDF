@@ -11,7 +11,9 @@ export async function POST(req: NextRequest) {
     const inputBytes = Buffer.from(await file.arrayBuffer());
     // failOn: "none" lets libvips recover from minor corruption/truncation
     // instead of hard-failing (common with images downloaded from chat apps).
-    let img = sharp(inputBytes, { failOn: "none" });
+    // .rotate() auto-orients using the EXIF Orientation tag (then strips it) —
+    // without it, phone/scanner photos come out sideways/mirrored in the output.
+    let img = sharp(inputBytes, { failOn: "none" }).rotate();
     let mime = "image/png";
     if (toFormat === "jpg") {
       img = img.flatten({ background: "#ffffff" }).jpeg({ quality: 92 });
