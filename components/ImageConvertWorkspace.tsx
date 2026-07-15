@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Upload, RefreshCw, Loader2, ArrowLeftRight, ImagePlus } from "lucide-react";
+import MergeResult from "./MergeResult";
 
 type ImageConvertWorkspaceProps = {
   mode?: "convert" | "to-pdf";
@@ -24,6 +25,7 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
+  const [pdfResult, setPdfResult] = useState<Blob | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const autoConvertedRef = useRef(false);
 
@@ -57,13 +59,10 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
         if (!res.ok) throw new Error((await res.json()).detail || "Lỗi");
         const skipped = res.headers.get("X-Skipped-Files");
         const blob = await res.blob();
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "converted.pdf";
-        a.click();
         if (skipped) {
           setError(`Đã bỏ qua ${decodeURIComponent(skipped)} vì file lỗi hoặc không đúng định dạng ảnh. Các ảnh còn lại đã được gộp thành công.`);
         }
+        setPdfResult(blob);
       } else {
         for (const f of files) {
           const form = new FormData();
@@ -97,6 +96,22 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
   }, [mode, files, status, convert]);
 
   const title = mode === "to-pdf" ? "Hình ảnh → PDF" : "Chuyển đổi định dạng ảnh";
+
+  if (pdfResult) {
+    return (
+      <MergeResult
+        blob={pdfResult}
+        initialName={files[0]?.name.replace(/\.\w+$/, "") || "converted"}
+        onRestart={() => {
+          setPdfResult(null);
+          setFiles([]);
+          setStatus("idle");
+          setError("");
+          onCancel?.();
+        }}
+      />
+    );
+  }
 
   if (files.length === 0) {
     return (

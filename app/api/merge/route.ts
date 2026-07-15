@@ -17,7 +17,15 @@ export async function POST(req: NextRequest) {
 
     for (let i = 0; i < files.length; i++) {
       const bytes = await files[i].arrayBuffer();
-      const src = await PDFDocument.load(bytes);
+      let src;
+      try {
+        src = await PDFDocument.load(bytes);
+      } catch {
+        return NextResponse.json(
+          { detail: `File '${files[i].name}' không phải PDF hợp lệ hoặc đã bị hỏng.` },
+          { status: 400 }
+        );
+      }
       const copiedPages = await result.copyPages(src, src.getPageIndices());
       const rot = ((rotations[i] || 0) % 360 + 360) % 360;
       copiedPages.forEach((page) => {
@@ -35,6 +43,6 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err) {
-    return NextResponse.json({ detail: `Gộp PDF thất bại: ${(err as Error).message}` }, { status: 500 });
+    return NextResponse.json({ detail: `Gộp PDF thất bại: ${(err as Error).message}` }, { status: 400 });
   }
 }

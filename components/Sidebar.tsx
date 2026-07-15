@@ -6,10 +6,9 @@ import {
   FileArchive,
   Scissors,
   FileText,
-  Image as ImageIcon,
+  ImagePlus,
   Languages,
   FileOutput,
-  ArrowLeftRight,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -21,9 +20,8 @@ const menuItems = [
   { id: "split", icon: <Scissors size={20} />, label: "Cắt PDF", path: "/tool/split" },
   { id: "pdf-to-word", icon: <FileText size={20} />, label: "PDF → Word", path: "/tool/pdf-to-word" },
   { id: "word-to-pdf", icon: <FileOutput size={20} />, label: "Word → PDF", path: "/tool/word-to-pdf" },
-  { id: "pdf-to-image", icon: <ImageIcon size={20} />, label: "PDF → Hình ảnh", path: "/tool/pdf-to-image" },
+  { id: "pdf-to-image", icon: <ImagePlus size={20} />, label: "PDF → Hình ảnh", path: "/tool/pdf-to-image" },
   { id: "image-to-pdf", icon: <FileText size={20} />, label: "Hình ảnh → PDF", path: "/tool/image-to-pdf" },
-  { id: "convert-image", icon: <ArrowLeftRight size={20} />, label: "Chuyển đổi ảnh", path: "/tool/convert-image" },
   { id: "translate", icon: <Languages size={20} />, label: "Dịch PDF", path: "/tool/translate" },
 ];
 

@@ -41,9 +41,11 @@ export default function PdfRenderer({
     setNativeRotation(page.rotate || 0);
   };
 
-  const onLoadError = (err: Error) => {
-    console.error("react-pdf load error:", err);
-  };
+  // Invalid/corrupt files are an expected, already-handled case — the `error`
+  // prop below shows a friendly fallback UI. Deliberately not logging here:
+  // Next.js's dev overlay counts both console.error and console.warn as an
+  // "Issue", which would misrepresent this as a real bug.
+  const onLoadError = () => {};
 
   return (
     <Document

@@ -11,8 +11,24 @@ export async function POST(req: NextRequest) {
     const fmt = ((formData.get("fmt") as string | null) || "png") as "png" | "jpg";
     if (!file) return NextResponse.json({ detail: "Không có file" }, { status: 400 });
 
+    const filename = file.name || "";
+    if (!filename.toLowerCase().endsWith(".pdf")) {
+      return NextResponse.json(
+        { detail: `File không hợp lệ: '${filename}'. Công cụ PDF sang Hình ảnh chỉ hỗ trợ file PDF (.pdf).` },
+        { status: 400 }
+      );
+    }
+
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const pdfDoc = await loadPdfDocument(bytes);
+    let pdfDoc;
+    try {
+      pdfDoc = await loadPdfDocument(bytes);
+    } catch {
+      return NextResponse.json(
+        { detail: `File '${filename}' không phải PDF hợp lệ hoặc đã bị hỏng.` },
+        { status: 400 }
+      );
+    }
     const zoom = dpi / 72;
 
     const images = [];
@@ -28,6 +44,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ total: images.length, images });
   } catch (err) {
-    return NextResponse.json({ detail: `Chuyển PDF sang ảnh thất bại: ${(err as Error).message}` }, { status: 500 });
+    return NextResponse.json({ detail: `Chuyển PDF sang ảnh thất bại: ${(err as Error).message}` }, { status: 400 });
   }
 }

@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { UploadCloud, ChevronDown } from "lucide-react";
 
 import PdfToWordWorkspace from "@/components/PdfToWordWorkspace";
-import PdfToImageWorkspace from "@/components/PdfToImageWorkspace";
+import PdfImageWorkspace from "@/components/PdfImageWorkspace";
 import WordToPdfWorkspace from "@/components/WordToPdfWorkspace";
 import ImageConvertWorkspace from "@/components/ImageConvertWorkspace";
 import CompressWorkspace from "@/components/CompressWorkspace";
@@ -76,7 +76,13 @@ export default function ToolPage() {
   };
 
   return (
-    <div className={files.length > 0 && (toolId === "merge" || toolId === "split") ? "merge-workspace-wrapper" : "tool-workspace"}>
+    <div
+      className={
+        files.length > 0 && (toolId === "merge" || toolId === "split" || toolId === "pdf-to-image" || toolId === "image-to-pdf")
+          ? "merge-workspace-wrapper"
+          : "tool-workspace"
+      }
+    >
       {toolId === "translate" ? (
         <TranslateWorkspace />
       ) : toolId === "pdf-to-word" ? (
@@ -106,10 +112,12 @@ export default function ToolPage() {
         <CompressWorkspace initialFiles={files} onCancel={() => setFiles([])} />
       ) : toolId === "word-to-pdf" ? (
         <WordToPdfWorkspace initialFiles={files} onCancel={() => setFiles([])} />
-      ) : toolId === "pdf-to-image" ? (
-        <PdfToImageWorkspace initialFiles={files} onCancel={() => setFiles([])} />
-      ) : toolId === "image-to-pdf" ? (
-        <ImageConvertWorkspace mode="to-pdf" initialFiles={files} onCancel={() => setFiles([])} />
+      ) : toolId === "pdf-to-image" || toolId === "image-to-pdf" ? (
+        <PdfImageWorkspace
+          initialMode={toolId === "image-to-pdf" ? "image-to-pdf" : "pdf-to-image"}
+          initialFiles={files}
+          onCancel={() => setFiles([])}
+        />
       ) : toolId === "convert-image" ? (
         <ImageConvertWorkspace mode="convert" initialFiles={files} onCancel={() => setFiles([])} />
       ) : (
