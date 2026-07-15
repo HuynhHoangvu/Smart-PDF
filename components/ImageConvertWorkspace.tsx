@@ -43,11 +43,15 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
         files.forEach((f) => form.append("files", f));
         const res = await fetch(`/api/images-to-pdf`, { method: "POST", body: form });
         if (!res.ok) throw new Error((await res.json()).detail || "Lỗi");
+        const skipped = res.headers.get("X-Skipped-Files");
         const blob = await res.blob();
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
         a.download = "converted.pdf";
         a.click();
+        if (skipped) {
+          setError(`Đã bỏ qua ${decodeURIComponent(skipped)} vì file lỗi hoặc không đúng định dạng ảnh. Các ảnh còn lại đã được gộp thành công.`);
+        }
       } else {
         for (const f of files) {
           const form = new FormData();
