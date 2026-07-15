@@ -20,8 +20,7 @@ const menuItems = [
   { id: "split", icon: <Scissors size={20} />, label: "Cắt PDF", path: "/tool/split" },
   { id: "pdf-to-word", icon: <FileText size={20} />, label: "PDF → Word", path: "/tool/pdf-to-word" },
   { id: "word-to-pdf", icon: <FileOutput size={20} />, label: "Word → PDF", path: "/tool/word-to-pdf" },
-  { id: "pdf-to-image", icon: <ImagePlus size={20} />, label: "PDF → Hình ảnh", path: "/tool/pdf-to-image" },
-  { id: "image-to-pdf", icon: <FileText size={20} />, label: "Hình ảnh → PDF", path: "/tool/image-to-pdf" },
+  { id: "pdf-to-image", icon: <ImagePlus size={20} />, label: "PDF ↔ Hình ảnh", path: "/tool/pdf-to-image", altPaths: ["/tool/image-to-pdf"] },
   { id: "translate", icon: <Languages size={20} />, label: "Dịch PDF", path: "/tool/translate" },
 ];
 
@@ -38,7 +37,7 @@ export default function Sidebar() {
           <Link
             href={item.path}
             key={item.id}
-            className={`sidebar-item ${pathname === item.path ? "active" : ""}`}
+            className={`sidebar-item ${pathname === item.path || item.altPaths?.includes(pathname) ? "active" : ""}`}
           >
             <div className="icon">{item.icon}</div>
             <div className="label">{item.label}</div>
