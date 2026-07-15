@@ -9,7 +9,9 @@ export async function POST(req: NextRequest) {
     if (!file) return NextResponse.json({ detail: "Không có file" }, { status: 400 });
 
     const inputBytes = Buffer.from(await file.arrayBuffer());
-    let img = sharp(inputBytes);
+    // failOn: "none" lets libvips recover from minor corruption/truncation
+    // instead of hard-failing (common with images downloaded from chat apps).
+    let img = sharp(inputBytes, { failOn: "none" });
     let mime = "image/png";
     if (toFormat === "jpg") {
       img = img.flatten({ background: "#ffffff" }).jpeg({ quality: 92 });
@@ -33,6 +35,6 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err) {
-    return NextResponse.json({ detail: `Chuyển đổi ảnh thất bại: ${(err as Error).message}` }, { status: 500 });
+    return NextResponse.json({ detail: `Chuyển đổi ảnh thất bại: file có thể bị hỏng hoặc không đúng định dạng ảnh (${(err as Error).message})` }, { status: 400 });
   }
 }

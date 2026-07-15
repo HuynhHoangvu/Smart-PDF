@@ -9,8 +9,17 @@ type ImageConvertWorkspaceProps = {
   onCancel?: () => void;
 };
 
+const IMAGE_EXTENSIONS = /\.(jpe?g|png|webp|gif|bmp|tiff?|avif|heic|heif)$/i;
+
+// Some browsers/OSes don't tag less common formats with a MIME type at all
+// (e.g. dragging a .heic file on Windows can report type === ""), so fall
+// back to the extension instead of silently dropping the file.
+function isImageFile(f: File) {
+  return f.type.startsWith("image/") || IMAGE_EXTENSIONS.test(f.name);
+}
+
 export default function ImageConvertWorkspace({ mode = "convert", initialFiles, onCancel }: ImageConvertWorkspaceProps) {
-  const [files, setFiles] = useState<File[]>(() => (initialFiles || []).filter((f) => f.type.startsWith("image/")));
+  const [files, setFiles] = useState<File[]>(() => (initialFiles || []).filter(isImageFile));
   const [toFmt, setToFmt] = useState(mode === "to-pdf" ? "pdf" : "png");
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [error, setError] = useState("");
@@ -18,11 +27,14 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
   const inputRef = useRef<HTMLInputElement>(null);
   const autoConvertedRef = useRef(false);
 
-  const accept = "image/*";
+  // Explicit extensions alongside the MIME wildcard — some browsers/OSes
+  // mis-tag less common formats (webp, heic, bmp) and would otherwise
+  // filter them out of the picker even though sharp can read them fine.
+  const accept = "image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.avif,.heic,.heif";
   const multi = mode === "to-pdf";
 
   const handleFiles = (fList: FileList | File[]) => {
-    setFiles(Array.from(fList).filter((f) => f.type.startsWith("image/")));
+    setFiles(Array.from(fList).filter(isImageFile));
     setStatus("idle");
     setError("");
   };
