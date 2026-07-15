@@ -1,30 +1,39 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { Upload, RefreshCw, Loader2, ArrowLeftRight } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Upload, RefreshCw, Loader2, ArrowLeftRight, ImagePlus } from "lucide-react";
 
 type ImageConvertWorkspaceProps = {
   mode?: "convert" | "to-pdf";
+  initialFiles?: File[];
   onCancel?: () => void;
 };
 
-export default function ImageConvertWorkspace({ mode = "convert", onCancel }: ImageConvertWorkspaceProps) {
-  const [files, setFiles] = useState<File[]>([]);
+export default function ImageConvertWorkspace({ mode = "convert", initialFiles, onCancel }: ImageConvertWorkspaceProps) {
+  const [files, setFiles] = useState<File[]>(() => (initialFiles || []).filter((f) => f.type.startsWith("image/")));
   const [toFmt, setToFmt] = useState(mode === "to-pdf" ? "pdf" : "png");
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [error, setError] = useState("");
+  const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const autoConvertedRef = useRef(false);
 
   const accept = "image/*";
   const multi = mode === "to-pdf";
 
-  const handleFiles = (fList: FileList) => {
-    setFiles(Array.from(fList));
+  const handleFiles = (fList: FileList | File[]) => {
+    setFiles(Array.from(fList).filter((f) => f.type.startsWith("image/")));
     setStatus("idle");
     setError("");
   };
 
-  const convert = async () => {
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    if (e.dataTransfer.files?.length) handleFiles(e.dataTransfer.files);
+  };
+
+  const convert = useCallback(async () => {
     if (!files.length) return;
     setStatus("loading");
     setError("");
@@ -58,9 +67,46 @@ export default function ImageConvertWorkspace({ mode = "convert", onCancel }: Im
       setError((e as Error).message);
       setStatus("error");
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [files, mode, toFmt]);
+
+  // Auto-combine as soon as images land (drag-drop or initialFiles) — no
+  // extra click needed for the to-pdf flow.
+  useEffect(() => {
+    if (mode === "to-pdf" && files.length > 0 && status === "idle" && !autoConvertedRef.current) {
+      autoConvertedRef.current = true;
+      convert();
+    }
+    if (files.length === 0) autoConvertedRef.current = false;
+  }, [mode, files, status, convert]);
 
   const title = mode === "to-pdf" ? "Hình ảnh → PDF" : "Chuyển đổi định dạng ảnh";
+
+  if (files.length === 0) {
+    return (
+      <div style={{ maxWidth: 600, margin: "40px auto", padding: 24 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>{title}</h2>
+        <div
+          className={`dropzone ${dragging ? "active" : ""}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={handleDrop}
+          onClick={() => inputRef.current?.click()}
+          style={{ cursor: "pointer" }}
+        >
+          <input ref={inputRef} type="file" accept={accept} multiple={multi} hidden onChange={(e) => e.target.files && handleFiles(e.target.files)} />
+          <ImagePlus className="dropzone-icon" size={60} />
+          <button className="dropzone-btn">
+            <Upload size={14} style={{ marginRight: 6 }} /> Chọn ảnh
+          </button>
+          <div className="dropzone-hint">{mode === "to-pdf" ? "hoặc kéo thả nhiều ảnh vào đây — tự động gộp thành PDF" : "hoặc kéo thả ảnh vào đây"}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: 600, margin: "40px auto", padding: 24 }}>
@@ -71,7 +117,7 @@ export default function ImageConvertWorkspace({ mode = "convert", onCancel }: Im
           <Upload size={14} style={{ marginRight: 6 }} /> Chọn ảnh
         </button>
         <input ref={inputRef} type="file" accept={accept} multiple={multi} hidden onChange={(e) => e.target.files && handleFiles(e.target.files)} />
-        {files.length > 0 && <span style={{ fontSize: 13, color: "#4a5568" }}>{files.length} file đã chọn</span>}
+        <span style={{ fontSize: 13, color: "#4a5568" }}>{files.length} file đã chọn</span>
       </div>
 
       {mode === "convert" && (

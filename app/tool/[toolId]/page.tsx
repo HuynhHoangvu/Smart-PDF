@@ -109,9 +109,9 @@ export default function ToolPage() {
       ) : toolId === "pdf-to-image" ? (
         <PdfToImageWorkspace initialFiles={files} onCancel={() => setFiles([])} />
       ) : toolId === "image-to-pdf" ? (
-        <ImageConvertWorkspace mode="to-pdf" onCancel={() => setFiles([])} />
+        <ImageConvertWorkspace mode="to-pdf" initialFiles={files} onCancel={() => setFiles([])} />
       ) : toolId === "convert-image" ? (
-        <ImageConvertWorkspace mode="convert" onCancel={() => setFiles([])} />
+        <ImageConvertWorkspace mode="convert" initialFiles={files} onCancel={() => setFiles([])} />
       ) : (
         <div style={{ textAlign: "center", marginTop: "50px" }}>
           <h3>Đã chọn {files.length} file</h3>
