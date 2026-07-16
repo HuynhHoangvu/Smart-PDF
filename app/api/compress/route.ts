@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
 import { loadPdfDocument, renderPageToJpeg } from "@/lib/pdfRaster";
+import { requireFile, assertMagicBytes, assertFileSize, assertEnum, sanitizeFilenameForHeader, handleApiError, ApiError, SIZE_LIMITS } from "@/lib/apiValidation";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    const file = formData.get("file") as File | null;
-    const level = ((formData.get("level") as string | null) || "medium") as "medium" | "extreme" | "ultra";
-    if (!file) return NextResponse.json({ detail: "Không có file" }, { status: 400 });
+    const file = requireFile(formData, "file");
+    const level = assertEnum(formData.get("level") as string | null, ["medium", "extreme", "ultra"] as const, "medium", "level");
+
+    assertFileSize(file, SIZE_LIMITS.pdf, "nén PDF");
+    const fileBuffer = await assertMagicBytes(file, "pdf");
 
     let zoom = 1.4;
     let quality = 0.7;
@@ -21,8 +24,13 @@ export async function POST(req: NextRequest) {
       quality = 0.35;
     }
 
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const pdfDoc = await loadPdfDocument(bytes);
+    const bytes = new Uint8Array(fileBuffer);
+    let pdfDoc;
+    try {
+      pdfDoc = await loadPdfDocument(bytes);
+    } catch {
+      throw new ApiError(`File "${file.name}" không phải PDF hợp lệ hoặc đã bị hỏng.`, 400);
+    }
     const numPages = pdfDoc.numPages;
 
     const outPdf = await PDFDocument.create();
@@ -45,10 +53,10 @@ export async function POST(req: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="compressed_${file.name}"`,
+        "Content-Disposition": `attachment; ${sanitizeFilenameForHeader(`compressed_${file.name}`, "compressed.pdf")}`,
       },
     });
   } catch (err) {
-    return NextResponse.json({ detail: `Nén PDF thất bại: ${(err as Error).message}` }, { status: 500 });
+    return handleApiError(err);
   }
 }

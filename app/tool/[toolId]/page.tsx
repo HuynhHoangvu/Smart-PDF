@@ -18,13 +18,30 @@ const SplitWorkspace = dynamic(() => import("@/components/SplitWorkspace"), { ss
 const TranslateWorkspace = dynamic(() => import("@/components/TranslateWorkspace"), { ssr: false });
 
 const toolConfig: Record<string, { title: string; formats: string[] }> = {
-  merge: { title: "Gộp PDF", formats: ["PDF"] },
+  merge: { title: "Gộp PDF", formats: ["PDF", "Ảnh"] },
   compress: { title: "Nén PDF", formats: ["PDF"] },
   split: { title: "Cắt PDF", formats: ["PDF"] },
   "pdf-to-word": { title: "PDF sang Word", formats: ["PDF"] },
   "pdf-to-image": { title: "PDF sang Hình ảnh", formats: ["PDF"] },
+  "image-to-pdf": { title: "Hình ảnh sang PDF", formats: ["Ảnh"] },
+  "convert-image": { title: "Chuyển đổi ảnh", formats: ["Ảnh"] },
   translate: { title: "Dịch PDF", formats: ["PDF", "DOCX"] },
+  "word-to-pdf": { title: "Word sang PDF", formats: ["DOCX"] },
   read: { title: "Đọc PDF", formats: ["PDF"] },
+};
+
+// UX hint only (not a security boundary — the server still validates real
+// file content) so the OS file picker pre-filters to what each tool expects.
+const toolAccept: Record<string, string> = {
+  merge: ".pdf,application/pdf,image/*",
+  compress: ".pdf,application/pdf",
+  split: ".pdf,application/pdf",
+  "pdf-to-word": ".pdf,application/pdf",
+  "pdf-to-image": ".pdf,application/pdf",
+  "image-to-pdf": "image/*",
+  "convert-image": "image/*",
+  translate: ".pdf,application/pdf",
+  "word-to-pdf": ".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 };
 
 export default function ToolPage() {
@@ -93,7 +110,14 @@ export default function ToolPage() {
           <button className="dropzone-btn">
             Chọn file <ChevronDown size={18} style={{ marginLeft: "5px" }} />
           </button>
-          <input type="file" id="file-upload" multiple style={{ display: "none" }} onChange={onFileChange} />
+          <input
+            type="file"
+            id="file-upload"
+            multiple
+            accept={toolAccept[toolId]}
+            style={{ display: "none" }}
+            onChange={onFileChange}
+          />
           <div className="dropzone-hint">Thêm các file PDF, hình ảnh, Word, Excel, và PowerPoint</div>
           <div className="dropzone-formats">
             Các định dạng được hỗ trợ:

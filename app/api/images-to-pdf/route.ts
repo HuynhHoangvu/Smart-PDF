@@ -1,20 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
 import sharp from "sharp";
+import { requireFiles, assertFileSize, handleApiError, SIZE_LIMITS } from "@/lib/apiValidation";
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    const files = formData.getAll("files") as File[];
-    if (!files.length) {
-      return NextResponse.json({ detail: "Không có ảnh hợp lệ" }, { status: 400 });
-    }
+    const files = requireFiles(formData, "files");
 
     const pdf = await PDFDocument.create();
     const failed: string[] = [];
 
     for (const f of files) {
       try {
+        assertFileSize(f, SIZE_LIMITS.image, "chuyển ảnh sang PDF");
         const inputBytes = Buffer.from(await f.arrayBuffer());
         // failOn: "none" lets libvips recover from minor corruption/truncation
         // (common with images downloaded from chat apps) instead of throwing.
@@ -64,6 +63,6 @@ export async function POST(req: NextRequest) {
     }
     return new NextResponse(Buffer.from(outBytes), { status: 200, headers });
   } catch (err) {
-    return NextResponse.json({ detail: `Chuyển ảnh sang PDF thất bại: ${(err as Error).message}` }, { status: 500 });
+    return handleApiError(err);
   }
 }

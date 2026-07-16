@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import PdfRenderer from "./PdfRenderer";
 import MergeResult from "./MergeResult";
+import { imageFileToPdfFile, isImageFile } from "@/lib/clientImageToPdf";
 
 type FileItem = {
   id: string;
@@ -63,17 +64,8 @@ type MergeWorkspaceProps = {
 
 export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspaceProps) {
   const [viewMode, setViewMode] = useState<"files" | "pages">("files");
-  const [files, setFiles] = useState<FileItem[]>(
-    initialFiles.map((file, index) => ({
-      id: `file-${Date.now()}-${index}`,
-      file,
-      name: file.name.replace(/\.[^/.]+$/, ""),
-      extension: file.name.split(".").pop() || "pdf",
-      selected: false,
-      rotation: 0,
-      pages: 1,
-    }))
-  );
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [isProcessingAdd, setIsProcessingAdd] = useState(false);
   const [pages, setPages] = useState<PageItem[]>([]);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [previewPage, setPreviewPage] = useState(1);
@@ -92,6 +84,57 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
   const enterFileView = () => setViewMode("files");
 
   const dragCounter = useRef(0);
+  const [insertAfterIdx, setInsertAfterIdx] = useState<number | null>(null);
+
+  // Images dropped into Merge are converted to a single-page PDF client-side
+  // (same sizing as the standalone image→PDF tool) before joining the file
+  // list — the rest of this component (preview, pdf-lib merge) only knows
+  // how to handle real PDF bytes.
+  const addRawFiles = async (rawFiles: File[], afterIdx?: number) => {
+    setIsProcessingAdd(true);
+    setMergeError(null);
+    try {
+      const converted = await Promise.all(
+        rawFiles.map((file) => (isImageFile(file) ? imageFileToPdfFile(file) : Promise.resolve(file)))
+      );
+      const newItems = converted.map((file, i) => ({
+        id: `file-${Date.now()}-${i}`,
+        file,
+        name: file.name.replace(/\.[^/.]+$/, ""),
+        extension: file.name.split(".").pop() || "pdf",
+        selected: false,
+        rotation: 0,
+        pages: 1,
+      }));
+      setFiles((prev) => {
+        if (afterIdx != null && afterIdx >= 0 && afterIdx < prev.length) {
+          const arr = [...prev];
+          arr.splice(afterIdx + 1, 0, ...newItems);
+          return arr;
+        }
+        return [...prev, ...newItems];
+      });
+      setInsertAfterIdx(null);
+      if (viewMode === "pages") setViewMode("files");
+    } catch (err) {
+      setMergeError((err as Error).message);
+    } finally {
+      setIsProcessingAdd(false);
+    }
+  };
+
+  const initialFilesProcessedRef = useRef(false);
+  useEffect(() => {
+    // React StrictMode double-invokes effects in dev to surface side-effect
+    // bugs; without this guard that would run addRawFiles twice and add
+    // every dropped file to the list twice.
+    if (initialFilesProcessedRef.current) return;
+    initialFilesProcessedRef.current = true;
+    // Deferred via microtask so the effect body itself never synchronously
+    // calls setState (addRawFiles sets isProcessingAdd immediately).
+    if (initialFiles?.length) Promise.resolve().then(() => addRawFiles(initialFiles));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const isFileDrag = (e: DragEvent) => e.dataTransfer?.types.includes("Files") ?? false;
@@ -117,8 +160,10 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
       dragCounter.current = 0;
       setIsGlobalDragging(false);
       if (e.dataTransfer?.files?.length) {
-        const pdfs = Array.from(e.dataTransfer.files).filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
-        if (pdfs.length) addRawFiles(pdfs);
+        const accepted = Array.from(e.dataTransfer.files).filter(
+          (f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf") || isImageFile(f)
+        );
+        if (accepted.length) addRawFiles(accepted);
       }
     };
     window.addEventListener("dragenter", onEnter);
@@ -133,30 +178,6 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const [insertAfterIdx, setInsertAfterIdx] = useState<number | null>(null);
-
-  const addRawFiles = (rawFiles: File[], afterIdx?: number) => {
-    const newItems = rawFiles.map((file, i) => ({
-      id: `file-${Date.now()}-${i}`,
-      file,
-      name: file.name.replace(/\.[^/.]+$/, ""),
-      extension: file.name.split(".").pop() || "pdf",
-      selected: false,
-      rotation: 0,
-      pages: 1,
-    }));
-    setFiles((prev) => {
-      if (afterIdx != null && afterIdx >= 0 && afterIdx < prev.length) {
-        const arr = [...prev];
-        arr.splice(afterIdx + 1, 0, ...newItems);
-        return arr;
-      }
-      return [...prev, ...newItems];
-    });
-    setInsertAfterIdx(null);
-    if (viewMode === "pages") setViewMode("files");
-  };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.length) addRawFiles(Array.from(e.target.files), insertAfterIdx ?? undefined);
@@ -347,7 +368,7 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
         <button className="toolbar-btn" onClick={() => { setInsertAfterIdx(null); document.getElementById("add-more-input")?.click(); }}>
           <Plus size={15} style={{ marginRight: 4 }} /> Thêm <ChevronDown size={13} />
         </button>
-        <input id="add-more-input" type="file" multiple hidden accept=".pdf" onChange={handleFileInput} />
+        <input id="add-more-input" type="file" multiple hidden accept=".pdf,application/pdf,image/*" onChange={handleFileInput} />
         <div className="toolbar-divider" />
         <button
           className="toolbar-icon-btn"
@@ -390,7 +411,7 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
           className="btn btn-primary"
           style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 148, justifyContent: "center" }}
           onClick={handleMerge}
-          disabled={isMerging || (viewMode === "files" && files.length < 2)}
+          disabled={isMerging || isProcessingAdd || (viewMode === "files" && files.length < 2)}
         >
           {isMerging ? (
             <>
@@ -441,6 +462,13 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
             <input type="checkbox" checked={pages.length > 0 && pages.every((p) => p.selected)} onChange={selectAllPages} />
             <span>Đã chọn {pages.filter((p) => p.selected).length} trang</span>
           </label>
+        </div>
+      )}
+
+      {viewMode === "files" && files.length === 0 && isProcessingAdd && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: 30, justifyContent: "center" }}>
+          <Loader2 size={16} className="spin" />
+          <span style={{ fontSize: 13, color: "#718096" }}>Đang xử lý file...</span>
         </div>
       )}
 
@@ -513,7 +541,7 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
               <Plus size={20} />
             </div>
             <div>
-              Thêm file PDF
+              Thêm file PDF/Ảnh
             </div>
           </div>
         </div>

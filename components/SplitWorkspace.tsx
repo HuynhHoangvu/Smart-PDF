@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { Trash2, RotateCw, Scissors, Download, Loader2, Eye, X, ChevronLeft, ChevronRight, Undo2 } from "lucide-react";
 import PdfRenderer from "./PdfRenderer";
 import MergeResult from "./MergeResult";
+import { validateFile, CLIENT_SIZE_LIMITS } from "@/lib/clientFileValidation";
 
 type PageItem = {
   id: string;
@@ -157,6 +158,22 @@ export default function SplitWorkspace({ initialFiles, onCancel }: SplitWorkspac
   }
 
   if (!file) return null;
+
+  const fileCheck = validateFile(file, {
+    maxSizeBytes: CLIENT_SIZE_LIMITS.pdf,
+    allowedExtensions: [".pdf"],
+    label: "Cắt PDF",
+  });
+  if (!fileCheck.ok) {
+    return (
+      <div style={{ textAlign: "center", marginTop: 60 }}>
+        <p style={{ color: "#e53e3e", marginBottom: 16 }}>{fileCheck.message}</p>
+        <button className="btn btn-outline" onClick={onCancel}>
+          Chọn file khác
+        </button>
+      </div>
+    );
+  }
 
   const previewPageItem = pages.find((p) => p.pageNum === previewPage);
 

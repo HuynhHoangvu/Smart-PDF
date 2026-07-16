@@ -7,10 +7,6 @@ import {
   FileText,
   Image as ImageIcon,
   Languages,
-  ScanText,
-  FileKey,
-  CheckSquare,
-  Settings,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -21,10 +17,6 @@ const tools = [
   { id: "pdf-to-word", title: "PDF sang Word", icon: <FileText size={20} />, color: "#3b82f6" },
   { id: "pdf-to-image", title: "PDF sang Hình ảnh", icon: <ImageIcon size={20} />, color: "#f59e0b" },
   { id: "translate", title: "Dịch", icon: <Languages size={20} />, color: "#3b82f6" },
-  { id: "read", title: "Đọc PDF", icon: <ScanText size={20} />, color: "#10b981" },
-  { id: "protect", title: "Bảo vệ PDF", icon: <FileKey size={20} />, color: "#ef4444" },
-  { id: "sign", title: "Ký tên", icon: <CheckSquare size={20} />, color: "#ec4899" },
-  { id: "edit", title: "Chỉnh sửa", icon: <Settings size={20} />, color: "#10b981" },
 ];
 
 export default function Home() {

@@ -12,11 +12,14 @@ function parseInlineStyle(style: string | undefined): Record<string, string> {
   return out;
 }
 
+const MAX_WALK_DEPTH = 50;
+
 function textRunsFromNode($: ReturnType<typeof cheerio.load>, el: Element, baseBold = false): TextRun[] {
   const runs: TextRun[] = [];
   const node = $(el);
 
-  const walk = (n: AnyNode, bold: boolean, italic: boolean) => {
+  const walk = (n: AnyNode, bold: boolean, italic: boolean, depth: number) => {
+    if (depth > MAX_WALK_DEPTH) return;
     if (n.type === "text") {
       const text = $(n).text();
       if (text) runs.push(new TextRun({ text, bold, italics: italic }));
@@ -32,11 +35,11 @@ function textRunsFromNode($: ReturnType<typeof cheerio.load>, el: Element, baseB
         runs.push(new TextRun({ text: "", break: 1 }));
         return;
       }
-      el.children?.forEach((c) => walk(c as AnyNode, isBold, isItalic));
+      el.children?.forEach((c) => walk(c as AnyNode, isBold, isItalic, depth + 1));
     }
   };
 
-  node.contents().each((_, c) => walk(c as AnyNode, baseBold, false));
+  node.contents().each((_, c) => walk(c as AnyNode, baseBold, false, 0));
   if (runs.length === 0) {
     const text = node.text();
     if (text.trim()) runs.push(new TextRun({ text, bold: baseBold }));

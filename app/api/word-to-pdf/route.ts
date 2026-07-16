@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import mammoth from "mammoth";
 import { renderHtmlToPdf } from "@/lib/htmlToPdf";
+import { requireFile, assertMagicBytes, assertFileSize, sanitizeFilenameForHeader, handleApiError, ApiError, SIZE_LIMITS } from "@/lib/apiValidation";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -8,11 +9,17 @@ export const maxDuration = 300;
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    const file = formData.get("file") as File | null;
-    if (!file) return NextResponse.json({ detail: "Không có file" }, { status: 400 });
+    const file = requireFile(formData, "file");
 
-    const bytes = Buffer.from(await file.arrayBuffer());
-    const { value: bodyHtml } = await mammoth.convertToHtml({ buffer: bytes });
+    assertFileSize(file, SIZE_LIMITS.docx, "chuyển Word sang PDF");
+    const fileBuffer = await assertMagicBytes(file, "docx");
+
+    let bodyHtml: string;
+    try {
+      ({ value: bodyHtml } = await mammoth.convertToHtml({ buffer: fileBuffer }));
+    } catch {
+      throw new ApiError(`File "${file.name}" không phải Word (.docx) hợp lệ hoặc đã bị hỏng.`, 400);
+    }
 
     const fullHtml = `<!DOCTYPE html>
 <html lang="vi">
@@ -36,10 +43,10 @@ export async function POST(req: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${baseName}.pdf"`,
+        "Content-Disposition": `attachment; ${sanitizeFilenameForHeader(`${baseName}.pdf`, "converted.pdf")}`,
       },
     });
   } catch (err) {
-    return NextResponse.json({ detail: (err as Error).message }, { status: 500 });
+    return handleApiError(err);
   }
 }

@@ -1,17 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
 import JSZip from "jszip";
+import { requireFile, assertMagicBytes, assertFileSize, sanitizeFilenameForHeader, handleApiError, ApiError, SIZE_LIMITS } from "@/lib/apiValidation";
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    const file = formData.get("file") as File | null;
+    const file = requireFile(formData, "file");
     const ranges = formData.get("ranges") as string | null;
-    if (!file || !ranges) {
-      return NextResponse.json({ detail: "Thiếu file hoặc ranges" }, { status: 400 });
+    if (!ranges) {
+      throw new ApiError("Thiếu thông tin phạm vi trang (ranges).", 400);
     }
 
-    const src = await PDFDocument.load(await file.arrayBuffer());
+    assertFileSize(file, SIZE_LIMITS.pdf, "cắt PDF");
+    const fileBuffer = await assertMagicBytes(file, "pdf");
+
+    let src;
+    try {
+      src = await PDFDocument.load(fileBuffer);
+    } catch {
+      throw new ApiError(`File "${file.name}" không phải PDF hợp lệ hoặc đã bị hỏng.`, 400);
+    }
     const total = src.getPageCount();
 
     const segments: [number, number][] = [];
@@ -26,13 +35,17 @@ export async function POST(req: NextRequest) {
       } else {
         start = end = parseInt(p, 10) - 1;
       }
+      if (!Number.isFinite(start) || !Number.isFinite(end)) {
+        throw new ApiError(`Phạm vi trang không hợp lệ: "${p}".`, 400);
+      }
       start = Math.max(0, Math.min(start, total - 1));
       end = Math.max(0, Math.min(end, total - 1));
+      if (end < start) [start, end] = [end, start];
       segments.push([start, end]);
     }
 
     if (!segments.length) {
-      return NextResponse.json({ detail: "Không có range hợp lệ" }, { status: 400 });
+      throw new ApiError("Không có phạm vi trang hợp lệ.", 400);
     }
 
     const base = (file.name || "document").replace(/\.[^/.]+$/, "");
@@ -53,10 +66,10 @@ export async function POST(req: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": "application/zip",
-        "Content-Disposition": `attachment; filename="${base}_split.zip"`,
+        "Content-Disposition": `attachment; ${sanitizeFilenameForHeader(`${base}_split.zip`, "split.zip")}`,
       },
     });
   } catch (err) {
-    return NextResponse.json({ detail: `Cắt PDF thất bại: ${(err as Error).message}` }, { status: 500 });
+    return handleApiError(err);
   }
 }

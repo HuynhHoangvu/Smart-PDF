@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
 import { translatePdfPageToHtml } from "@/lib/gemini";
+import { sanitizeTranslatedHtml } from "@/lib/sanitizeHtml";
+import { requireFile, assertMagicBytes, assertFileSize, handleApiError, ApiError, SIZE_LIMITS } from "@/lib/apiValidation";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
+
+const MAX_TRANSLATE_PAGES = 60;
 
 type TranslatedPage = {
   page_num: number;
@@ -38,12 +42,22 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T,
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    const file = formData.get("file") as File | null;
-    if (!file) return NextResponse.json({ detail: "Không có file" }, { status: 400 });
+    const file = requireFile(formData, "file");
 
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const src = await PDFDocument.load(bytes);
+    assertFileSize(file, SIZE_LIMITS.pdf, "dịch PDF");
+    const fileBuffer = await assertMagicBytes(file, "pdf");
+
+    const bytes = new Uint8Array(fileBuffer);
+    let src;
+    try {
+      src = await PDFDocument.load(bytes);
+    } catch {
+      throw new ApiError(`File "${file.name}" không phải PDF hợp lệ hoặc đã bị hỏng.`, 400);
+    }
     const numPages = src.getPageCount();
+    if (numPages > MAX_TRANSLATE_PAGES) {
+      throw new ApiError(`PDF có ${numPages} trang, vượt quá giới hạn ${MAX_TRANSLATE_PAGES} trang cho mỗi lần dịch.`, 400);
+    }
     const pageIndices = Array.from({ length: numPages }, (_, i) => i);
 
     const translatedPages = await mapWithConcurrency(pageIndices, 4, async (pageIndex): Promise<TranslatedPage> => {
@@ -58,7 +72,7 @@ export async function POST(req: NextRequest) {
       if (!html) html = "<p style='color:#e53e3e;text-align:center;'>Translation failed for this page.</p>";
       return {
         page_num: pageNum,
-        translated_html: html,
+        translated_html: sanitizeTranslatedHtml(html),
         group_id: pageNum,
         is_group_lead: true,
         group_pages: [pageNum],
@@ -72,6 +86,6 @@ export async function POST(req: NextRequest) {
       pages: translatedPages,
     });
   } catch (err) {
-    return NextResponse.json({ detail: `translate_html_failed: ${(err as Error).message}` }, { status: 500 });
+    return handleApiError(err);
   }
 }

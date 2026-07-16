@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument, degrees } from "pdf-lib";
+import { requireFiles, parseJsonBody, sanitizeFilenameForHeader, handleApiError, ApiError } from "@/lib/apiValidation";
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    const files = formData.getAll("files") as File[];
+    const files = requireFiles(formData, "files");
     const rotationsRaw = formData.get("rotations") as string | null;
     const outputName = (formData.get("output_name") as string | null) || "merged";
-    const rotations: number[] = rotationsRaw ? JSON.parse(rotationsRaw) : [];
-
-    if (!files.length) {
-      return NextResponse.json({ detail: "Không có file nào được gửi lên" }, { status: 400 });
-    }
+    const rotations: number[] = rotationsRaw ? parseJsonBody<number[]>(rotationsRaw) : [];
 
     const result = await PDFDocument.create();
 
@@ -21,10 +18,7 @@ export async function POST(req: NextRequest) {
       try {
         src = await PDFDocument.load(bytes);
       } catch {
-        return NextResponse.json(
-          { detail: `File '${files[i].name}' không phải PDF hợp lệ hoặc đã bị hỏng.` },
-          { status: 400 }
-        );
+        throw new ApiError(`File '${files[i].name}' không phải PDF hợp lệ hoặc đã bị hỏng.`, 400);
       }
       const copiedPages = await result.copyPages(src, src.getPageIndices());
       const rot = ((rotations[i] || 0) % 360 + 360) % 360;
@@ -39,10 +33,10 @@ export async function POST(req: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${outputName}.pdf"`,
+        "Content-Disposition": `attachment; ${sanitizeFilenameForHeader(`${outputName}.pdf`, "merged.pdf")}`,
       },
     });
   } catch (err) {
-    return NextResponse.json({ detail: `Gộp PDF thất bại: ${(err as Error).message}` }, { status: 400 });
+    return handleApiError(err);
   }
 }

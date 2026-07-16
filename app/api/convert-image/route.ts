@@ -1,19 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
+import { requireFile, assertMagicBytes, assertFileSize, assertEnum, sanitizeFilenameForHeader, handleApiError, ApiError, SIZE_LIMITS } from "@/lib/apiValidation";
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    const file = formData.get("file") as File | null;
-    const toFormat = ((formData.get("to_format") as string | null) || "png") as "png" | "jpg" | "webp";
-    if (!file) return NextResponse.json({ detail: "Không có file" }, { status: 400 });
+    const file = requireFile(formData, "file");
+    const toFormat = assertEnum(formData.get("to_format") as string | null, ["png", "jpg", "webp"] as const, "png", "to_format");
 
-    const inputBytes = Buffer.from(await file.arrayBuffer());
-    // failOn: "none" lets libvips recover from minor corruption/truncation
-    // instead of hard-failing (common with images downloaded from chat apps).
-    // .rotate() auto-orients using the EXIF Orientation tag (then strips it) —
-    // without it, phone/scanner photos come out sideways/mirrored in the output.
-    let img = sharp(inputBytes, { failOn: "none" }).rotate();
+    assertFileSize(file, SIZE_LIMITS.image, "chuyển đổi ảnh");
+    const inputBytes = await assertMagicBytes(file, "image");
+
+    let img;
+    try {
+      // failOn: "none" lets libvips recover from minor corruption/truncation
+      // instead of hard-failing (common with images downloaded from chat apps).
+      // .rotate() auto-orients using the EXIF Orientation tag (then strips it) —
+      // without it, phone/scanner photos come out sideways/mirrored in the output.
+      img = sharp(inputBytes, { failOn: "none" }).rotate();
+    } catch {
+      throw new ApiError(`Tệp "${file.name}" không phải ảnh hợp lệ hoặc đã bị hỏng.`, 400);
+    }
     let mime = "image/png";
     if (toFormat === "jpg") {
       img = img.flatten({ background: "#ffffff" }).jpeg({ quality: 92 });
@@ -26,17 +33,22 @@ export async function POST(req: NextRequest) {
       mime = "image/png";
     }
 
-    const outBuffer = await img.toBuffer();
+    let outBuffer;
+    try {
+      outBuffer = await img.toBuffer();
+    } catch {
+      throw new ApiError(`Không thể xử lý ảnh "${file.name}", tệp có thể bị hỏng.`, 400);
+    }
     const baseName = file.name.replace(/\.[^/.]+$/, "");
 
     return new NextResponse(outBuffer, {
       status: 200,
       headers: {
         "Content-Type": mime,
-        "Content-Disposition": `attachment; filename="${baseName}.${toFormat}"`,
+        "Content-Disposition": `attachment; ${sanitizeFilenameForHeader(`${baseName}.${toFormat}`, `converted.${toFormat}`)}`,
       },
     });
   } catch (err) {
-    return NextResponse.json({ detail: `Chuyển đổi ảnh thất bại: file có thể bị hỏng hoặc không đúng định dạng ảnh (${(err as Error).message})` }, { status: 400 });
+    return handleApiError(err);
   }
 }

@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { Upload, Download, Image as ImageIcon, RefreshCw, Loader2 } from "lucide-react";
+import { validateFile, CLIENT_SIZE_LIMITS } from "@/lib/clientFileValidation";
 
 type ImageResult = { page: number; data: string; mime: string; ext: string };
 
@@ -40,8 +41,15 @@ export default function PdfToImageWorkspace({ initialFiles, onCancel }: PdfToIma
   };
 
   const handleFile = (f: File) => {
+    const check = validateFile(f, { maxSizeBytes: CLIENT_SIZE_LIMITS.pdf, allowedExtensions: [".pdf"], label: "PDF sang Hình ảnh" });
+    if (!check.ok) {
+      setError(check.message);
+      setStatus("error");
+      return;
+    }
     setFile(f);
     setImages([]);
+    setError("");
     setStatus("idle");
   };
 

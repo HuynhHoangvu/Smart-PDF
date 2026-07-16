@@ -57,6 +57,8 @@ a {
   font-weight: bold;
   font-size: 24px;
   padding: 0 20px;
+  display: flex;
+  align-items: center;
 }
 
 .sidebar-menu {
@@ -94,12 +96,45 @@ a {
   transition: opacity 0.2s ease;
 }
 
+/* Mobile menu toggle / close / backdrop — hidden on desktop, see the
+   responsive section at the bottom of this file for the mobile behavior. */
+.sidebar-mobile-toggle {
+  display: none;
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 30;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: none;
+  background: var(--sidebar-bg);
+  color: white;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.sidebar-close-btn {
+  display: none;
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--sidebar-text);
+  cursor: pointer;
+  padding: 4px;
+}
+.sidebar-backdrop {
+  display: none;
+}
+
 /* Main Content */
 .main-content {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  min-width: 0;
 }
 
 .btn {
@@ -1300,6 +1335,239 @@ a {
   border-top: 2px dashed #e2e8f0;
   padding-top: 32px;
   margin-top: 32px;
+}
+
+/* =========================================================
+   RESPONSIVE
+   Two breakpoints:
+   - Tablet (<=1024px): sidebar collapses to an icon rail
+     (labels hidden), grids/panels tighten up but keep their
+     side-by-side layout.
+   - Mobile (<=768px): sidebar becomes an off-canvas drawer
+     behind a hamburger button, and every two-column layout
+     (result screens, translate panels) stacks vertically.
+   ========================================================= */
+
+/* -- Tablet: icon-only sidebar --------------------------- */
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 76px;
+  }
+  .sidebar-logo {
+    padding: 0 0 0 20px;
+    justify-content: flex-start;
+  }
+  .sidebar-item {
+    padding: 12px 0;
+    justify-content: center;
+  }
+  .sidebar-item .icon {
+    margin-right: 0;
+  }
+  .sidebar-item .label {
+    display: none;
+  }
+
+  .page-container {
+    padding: 24px;
+  }
+  .tool-workspace {
+    padding: 24px;
+  }
+  .workspace-grid {
+    padding: 16px 20px;
+  }
+  .result-actions-panel {
+    width: 260px;
+    min-width: 240px;
+    padding: 20px 16px;
+  }
+}
+
+/* -- Mobile: off-canvas sidebar + stacked layouts -------- */
+@media (max-width: 768px) {
+  .sidebar-mobile-toggle {
+    display: flex;
+  }
+
+  .app-container {
+    display: block;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 240px;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 40;
+    overflow-y: auto;
+  }
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+  .sidebar-logo {
+    padding: 0 16px;
+    justify-content: space-between;
+  }
+  .sidebar-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sidebar-item {
+    padding: 12px 20px;
+    justify-content: flex-start;
+  }
+  .sidebar-item .icon {
+    margin-right: 15px;
+  }
+  .sidebar-item .label {
+    display: block;
+  }
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 35;
+  }
+
+  .main-content {
+    overflow-y: visible;
+    padding-top: 56px; /* clears the fixed hamburger button */
+  }
+
+  /* Home page */
+  .page-container {
+    padding: 16px;
+  }
+  .tool-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  /* Generic tool workspace / dropzone */
+  .tool-workspace {
+    padding: 16px;
+    min-height: auto;
+  }
+  .dropzone {
+    height: auto;
+    min-height: 280px;
+    padding: 24px 16px;
+  }
+  .dropzone-formats {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* Merge/Split/etc. workspace toolbar + grids */
+  .merge-workspace-wrapper {
+    min-height: auto;
+  }
+  .workspace-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .toolbar-left {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .toolbar-right {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .workspace-sub-toolbar {
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .workspace-grid {
+    padding: 12px;
+    justify-content: center;
+  }
+  .preview-modal-content {
+    width: 100%;
+    max-width: 96%;
+    max-height: 92vh;
+  }
+
+  /* Result screens (MergeResult / image-to-pdf result) stack instead
+     of a fixed-width side panel next to the preview. */
+  .merge-result-container {
+    flex-direction: column;
+    height: auto;
+    min-height: calc(100vh - 56px);
+    overflow: visible;
+  }
+  .result-pdf-viewer {
+    flex: none;
+    height: 55vh;
+  }
+  .result-actions-panel {
+    width: 100%;
+    min-width: 0;
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+    padding: 20px 16px;
+  }
+
+  /* Translate workspace: two side-by-side panels stack vertically */
+  .translate-result-container {
+    height: auto;
+    min-height: calc(100vh - 56px);
+    overflow: visible;
+  }
+  .translate-result-topbar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .translate-topbar-left,
+  .translate-topbar-right {
+    flex-wrap: wrap;
+  }
+  .translate-filename {
+    max-width: 160px;
+  }
+  .translate-panels {
+    flex-direction: column;
+    overflow: visible;
+  }
+  .translate-panel-col {
+    flex: none;
+    height: 60vh;
+  }
+  .translate-panel-col-left {
+    border-right: none;
+    border-bottom: 2px solid var(--border-color);
+  }
+  .translated-page-content {
+    padding: 14px 16px;
+  }
+  .translate-loading-card {
+    padding: 18px 16px;
+  }
+  .translate-loading-skeleton-grid {
+    grid-template-columns: 1fr;
+  }
+  .translate-loading-mini-cards {
+    grid-template-columns: 1fr;
+  }
+  .translate-dropzone-title {
+    font-size: 22px;
+  }
+
+  .docx-preview-wrapper {
+    padding: 20px 16px;
+  }
 }
 
 

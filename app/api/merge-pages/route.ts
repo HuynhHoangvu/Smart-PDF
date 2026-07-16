@@ -1,21 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument, degrees } from "pdf-lib";
+import { requireFiles, parseJsonBody, sanitizeFilenameForHeader, handleApiError, ApiError } from "@/lib/apiValidation";
 
 type ManifestEntry = { file_index: number; page: number; rotation?: number };
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    const files = formData.getAll("files") as File[];
+    const files = requireFiles(formData, "files");
     const manifestRaw = formData.get("manifest") as string | null;
     const outputName = (formData.get("output_name") as string | null) || "merged";
 
-    if (!files.length || !manifestRaw) {
-      return NextResponse.json({ detail: "Thiếu file hoặc manifest" }, { status: 400 });
+    if (!manifestRaw) {
+      throw new ApiError("Thiếu manifest.", 400);
     }
 
-    const manifest: ManifestEntry[] = JSON.parse(manifestRaw);
-    const docs = await Promise.all(files.map(async (f) => PDFDocument.load(await f.arrayBuffer())));
+    const manifest = parseJsonBody<ManifestEntry[]>(manifestRaw);
+    const docs = await Promise.all(
+      files.map(async (f) => {
+        try {
+          return await PDFDocument.load(await f.arrayBuffer());
+        } catch {
+          throw new ApiError(`File "${f.name}" không phải PDF hợp lệ hoặc đã bị hỏng.`, 400);
+        }
+      })
+    );
 
     const result = await PDFDocument.create();
 
@@ -34,10 +43,10 @@ export async function POST(req: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${outputName}.pdf"`,
+        "Content-Disposition": `attachment; ${sanitizeFilenameForHeader(`${outputName}.pdf`, "merged.pdf")}`,
       },
     });
   } catch (err) {
-    return NextResponse.json({ detail: `Ghép trang thất bại: ${(err as Error).message}` }, { status: 500 });
+    return handleApiError(err);
   }
 }

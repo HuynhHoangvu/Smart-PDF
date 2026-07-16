@@ -32,6 +32,7 @@ export default function MergeResult({ blob, initialName = "merged", onRestart }:
   const [exportingDocx, setExportingDocx] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const [objectUrl] = useState(() => URL.createObjectURL(blob));
+  const [exportError, setExportError] = useState("");
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -56,11 +57,12 @@ export default function MergeResult({ blob, initialName = "merged", onRestart }:
   const handleExportDocx = async () => {
     setShowExportMenu(false);
     setExportingDocx(true);
+    setExportError("");
     try {
       const formData = new FormData();
       formData.append("file", blob, (fileName || "merged") + ".pdf");
       const res = await fetch(`/api/pdf-to-word`, { method: "POST", body: formData });
-      if (!res.ok) throw new Error("Chuyển đổi thất bại");
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail || "Chuyển đổi thất bại");
       const docxBlob = await res.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(docxBlob);
@@ -69,7 +71,7 @@ export default function MergeResult({ blob, initialName = "merged", onRestart }:
       a.click();
       a.remove();
     } catch (err) {
-      alert("Xuất DOCX thất bại: " + (err as Error).message);
+      setExportError("Xuất DOCX thất bại: " + (err as Error).message);
     } finally {
       setExportingDocx(false);
     }
@@ -142,6 +144,9 @@ export default function MergeResult({ blob, initialName = "merged", onRestart }:
           <div className="result-meta">
             {fileSizeMB} MB · {numPages ? `${numPages} trang` : "…"}
           </div>
+          {exportError && (
+            <div style={{ color: "#e53e3e", fontSize: 13, marginTop: 6 }}>{exportError}</div>
+          )}
         </div>
 
         <button className="btn btn-primary result-download-btn" onClick={handleDownload}>

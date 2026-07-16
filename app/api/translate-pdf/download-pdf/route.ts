@@ -1,19 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { renderHtmlToPdf } from "@/lib/htmlToPdf";
+import { sanitizeTranslatedHtml } from "@/lib/sanitizeHtml";
+import { handleApiError, ApiError, sanitizeFilenameForHeader } from "@/lib/apiValidation";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-type TranslationPage = { translated_html?: string };
-type TranslationResult = { pages?: TranslationPage[]; original_filename?: string };
+const TranslationResultSchema = z.object({
+  pages: z.array(z.object({ translated_html: z.string().optional() })).min(1),
+  original_filename: z.string().optional(),
+});
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as { result: TranslationResult };
-    const result = body.result;
-    const pages = result.pages || [];
+    let body: { result?: unknown };
+    try {
+      body = await req.json();
+    } catch {
+      throw new ApiError("Dữ liệu JSON gửi lên không hợp lệ.", 400);
+    }
+    const parsed = TranslationResultSchema.safeParse(body.result);
+    if (!parsed.success) {
+      throw new ApiError("Dữ liệu kết quả dịch không hợp lệ.", 400);
+    }
+    const result = parsed.data;
 
-    const pageDivs = pages.map((p) => `<div class="doc-page">${p.translated_html || ""}</div>`).join("");
+    const pageDivs = result.pages
+      .map((p) => `<div class="doc-page">${sanitizeTranslatedHtml(p.translated_html || "")}</div>`)
+      .join("");
 
     const fullHtml = `<!DOCTYPE html>
 <html lang="en">
@@ -67,10 +82,10 @@ export async function POST(req: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${baseName}_translated.pdf"`,
+        "Content-Disposition": `attachment; ${sanitizeFilenameForHeader(`${baseName}_translated.pdf`, "translated.pdf")}`,
       },
     });
   } catch (err) {
-    return NextResponse.json({ detail: `Không thể tạo file PDF: ${(err as Error).message}` }, { status: 500 });
+    return handleApiError(err);
   }
 }

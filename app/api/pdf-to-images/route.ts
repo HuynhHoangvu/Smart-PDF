@@ -1,33 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadPdfDocument, renderPageToJpeg, renderPageToPng } from "@/lib/pdfRaster";
+import { requireFile, assertMagicBytes, assertFileSize, assertEnum, assertBoundedNumber, handleApiError, ApiError, SIZE_LIMITS } from "@/lib/apiValidation";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    const file = formData.get("file") as File | null;
-    const dpi = Number(formData.get("dpi") || 150);
-    const fmt = ((formData.get("fmt") as string | null) || "png") as "png" | "jpg";
-    if (!file) return NextResponse.json({ detail: "Không có file" }, { status: 400 });
+    const file = requireFile(formData, "file");
+    const dpi = assertBoundedNumber(formData.get("dpi") as string | null, { min: 36, max: 300, default: 150, integer: true }, "dpi");
+    const fmt = assertEnum(formData.get("fmt") as string | null, ["png", "jpg"] as const, "png", "fmt");
 
-    const filename = file.name || "";
-    if (!filename.toLowerCase().endsWith(".pdf")) {
-      return NextResponse.json(
-        { detail: `File không hợp lệ: '${filename}'. Công cụ PDF sang Hình ảnh chỉ hỗ trợ file PDF (.pdf).` },
-        { status: 400 }
-      );
-    }
+    assertFileSize(file, SIZE_LIMITS.pdf, "chuyển PDF sang ảnh");
+    const fileBuffer = await assertMagicBytes(file, "pdf");
 
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    const bytes = new Uint8Array(fileBuffer);
     let pdfDoc;
     try {
       pdfDoc = await loadPdfDocument(bytes);
     } catch {
-      return NextResponse.json(
-        { detail: `File '${filename}' không phải PDF hợp lệ hoặc đã bị hỏng.` },
-        { status: 400 }
-      );
+      throw new ApiError(`File "${file.name}" không phải PDF hợp lệ hoặc đã bị hỏng.`, 400);
     }
     const zoom = dpi / 72;
 
@@ -44,6 +36,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ total: images.length, images });
   } catch (err) {
-    return NextResponse.json({ detail: `Chuyển PDF sang ảnh thất bại: ${(err as Error).message}` }, { status: 400 });
+    return handleApiError(err);
   }
 }
