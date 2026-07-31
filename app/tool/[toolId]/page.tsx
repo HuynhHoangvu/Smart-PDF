@@ -8,14 +8,15 @@ import { UploadCloud, ChevronDown } from "lucide-react";
 import PdfToWordWorkspace from "@/components/PdfToWordWorkspace";
 import PdfImageWorkspace from "@/components/PdfImageWorkspace";
 import WordToPdfWorkspace from "@/components/WordToPdfWorkspace";
-import ImageConvertWorkspace from "@/components/ImageConvertWorkspace";
 import CompressWorkspace from "@/components/CompressWorkspace";
 
 // react-pdf touches browser-only globals (DOMMatrix) at module-eval time, so
-// any component that renders PDF thumbnails must be excluded from SSR.
+// any component that renders PDF thumbnails (directly or via MergeResult)
+// must be excluded from SSR.
 const MergeWorkspace = dynamic(() => import("@/components/MergeWorkspace"), { ssr: false });
 const SplitWorkspace = dynamic(() => import("@/components/SplitWorkspace"), { ssr: false });
 const TranslateWorkspace = dynamic(() => import("@/components/TranslateWorkspace"), { ssr: false });
+const ImageConvertWorkspace = dynamic(() => import("@/components/ImageConvertWorkspace"), { ssr: false });
 
 const toolConfig: Record<string, { title: string; formats: string[] }> = {
   merge: { title: "Gộp PDF", formats: ["PDF", "Ảnh"] },
