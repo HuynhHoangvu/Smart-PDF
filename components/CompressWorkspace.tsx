@@ -281,16 +281,17 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
             alignItems: "center",
             gap: 16,
             padding: 20,
-            borderRadius: 8,
-            border: `2px solid ${level === "medium" ? "#3182ce" : "#e2e8f0"}`,
-            background: level === "medium" ? "#f7fafc" : "#fff",
+            borderRadius: "var(--neu-radius-sm)",
+            border: "none",
+            background: "var(--bg-color)",
+            boxShadow: level === "medium" ? "var(--neu-pressed)" : "var(--neu-raised-sm)",
             cursor: "pointer",
             transition: "all 0.15s ease",
           }}
           onClick={() => setLevel("medium")}
         >
-          <input type="radio" checked={level === "medium"} onChange={() => {}} style={{ cursor: "pointer" }} />
-          <div style={{ width: 44, height: 44, background: "#ebf8ff", color: "#3182ce", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <input type="radio" checked={level === "medium"} onChange={() => {}} style={{ cursor: "pointer", accentColor: "var(--accent-pink)" }} />
+          <div style={{ width: 44, height: 44, background: "var(--accent-pink-soft)", color: "var(--accent-pink)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Settings size={22} />
           </div>
           <div style={{ flex: 1 }}>
@@ -306,16 +307,17 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
             alignItems: "center",
             gap: 16,
             padding: 20,
-            borderRadius: 8,
-            border: `2px solid ${level === "extreme" ? "#e53e3e" : "#e2e8f0"}`,
-            background: level === "extreme" ? "#fff5f5" : "#fff",
+            borderRadius: "var(--neu-radius-sm)",
+            border: "none",
+            background: "var(--bg-color)",
+            boxShadow: level === "extreme" ? "var(--neu-pressed)" : "var(--neu-raised-sm)",
             cursor: "pointer",
             transition: "all 0.15s ease",
           }}
           onClick={() => setLevel("extreme")}
         >
-          <input type="radio" checked={level === "extreme"} onChange={() => {}} style={{ cursor: "pointer" }} />
-          <div style={{ width: 44, height: 44, background: "#fff5f5", color: "#e53e3e", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <input type="radio" checked={level === "extreme"} onChange={() => {}} style={{ cursor: "pointer", accentColor: "var(--accent-pink)" }} />
+          <div style={{ width: 44, height: 44, background: "var(--accent-pink-soft)", color: "var(--accent-pink)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Zap size={22} />
           </div>
           <div style={{ flex: 1 }}>
@@ -331,16 +333,17 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
             alignItems: "center",
             gap: 16,
             padding: 20,
-            borderRadius: 8,
-            border: `2px solid ${level === "ultra" ? "#553c9a" : "#e2e8f0"}`,
-            background: level === "ultra" ? "#faf5ff" : "#fff",
+            borderRadius: "var(--neu-radius-sm)",
+            border: "none",
+            background: "var(--bg-color)",
+            boxShadow: level === "ultra" ? "var(--neu-pressed)" : "var(--neu-raised-sm)",
             cursor: "pointer",
             transition: "all 0.15s ease",
           }}
           onClick={() => setLevel("ultra")}
         >
-          <input type="radio" checked={level === "ultra"} onChange={() => {}} style={{ cursor: "pointer" }} />
-          <div style={{ width: 44, height: 44, background: "#faf5ff", color: "#553c9a", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <input type="radio" checked={level === "ultra"} onChange={() => {}} style={{ cursor: "pointer", accentColor: "var(--accent-pink)" }} />
+          <div style={{ width: 44, height: 44, background: "var(--accent-pink-soft)", color: "var(--accent-pink)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Zap size={22} />
           </div>
           <div style={{ flex: 1 }}>

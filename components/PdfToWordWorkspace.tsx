@@ -124,7 +124,7 @@ export default function PdfToWordWorkspace() {
         <div className="dropzone-hint">hoặc kéo thả file PDF vào đây</div>
         <div className="dropzone-formats">
           Định dạng hỗ trợ:&nbsp;
-          <span className="format-badge ml-1" style={{ background: "#fee2e2", color: "#ef4444" }}>
+          <span className="format-badge ml-1" style={{ background: "var(--accent-pink-soft)", color: "var(--accent-pink)" }}>
             PDF
           </span>
         </div>

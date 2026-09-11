@@ -143,8 +143,8 @@ export default function WordToPdfWorkspace({ initialFiles, onCancel }: WordToPdf
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-            <div style={{ width: 36, height: 36, background: "#fee2e2", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <FileOutput size={18} style={{ color: "#dc2626" }} />
+            <div style={{ width: 36, height: 36, background: "var(--accent-pink-soft)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <FileOutput size={18} style={{ color: "var(--accent-pink)" }} />
             </div>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: "#1a202c", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 320 }}>{resultFilename}</div>

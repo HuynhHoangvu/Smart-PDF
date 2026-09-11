@@ -11,15 +11,17 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+// One shared pastel-pink neumorphic chip for every icon instead of a
+// different bright color per tool — see .tool-icon in globals.css.
 const tools = [
-  { id: "merge", title: "Gộp", icon: <Layers size={20} />, color: "#8b5cf6" },
-  { id: "compress", title: "Nén", icon: <FileArchive size={20} />, color: "#ef4444" },
-  { id: "split", title: "Cắt", icon: <Scissors size={20} />, color: "#8b5cf6" },
-  { id: "pdf-to-word", title: "PDF sang Word", icon: <FileText size={20} />, color: "#3b82f6" },
-  { id: "pdf-to-image", title: "PDF sang Hình ảnh", icon: <ImageIcon size={20} />, color: "#f59e0b" },
-  { id: "compress-image", title: "Nén hình ảnh", icon: <ImageIcon size={20} />, color: "#ef4444" },
-  { id: "sign", title: "Ký tên", icon: <PenLine size={20} />, color: "#8b5cf6" },
-  { id: "translate", title: "Dịch", icon: <Languages size={20} />, color: "#3b82f6" },
+  { id: "merge", title: "Gộp", icon: <Layers size={20} /> },
+  { id: "compress", title: "Nén", icon: <FileArchive size={20} /> },
+  { id: "split", title: "Cắt", icon: <Scissors size={20} /> },
+  { id: "pdf-to-word", title: "PDF sang Word", icon: <FileText size={20} /> },
+  { id: "pdf-to-image", title: "PDF sang Hình ảnh", icon: <ImageIcon size={20} /> },
+  { id: "compress-image", title: "Nén hình ảnh", icon: <ImageIcon size={20} /> },
+  { id: "sign", title: "Ký tên", icon: <PenLine size={20} /> },
+  { id: "translate", title: "Dịch", icon: <Languages size={20} /> },
 ];
 
 export default function Home() {
@@ -35,9 +37,7 @@ export default function Home() {
             className="tool-card"
             onClick={() => router.push(`/tool/${tool.id}`)}
           >
-            <div className="tool-icon" style={{ backgroundColor: tool.color }}>
-              {tool.icon}
-            </div>
+            <div className="tool-icon">{tool.icon}</div>
             <div className="tool-title">{tool.title}</div>
           </div>
         ))}

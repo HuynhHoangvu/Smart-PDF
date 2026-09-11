@@ -54,7 +54,7 @@ export default function FileDropzone({ accept, multiple = false, formats, hint, 
       <div className="dropzone-formats">
         Các định dạng được hỗ trợ:
         {formats.map((f) => (
-          <span key={f} className="format-badge ml-1" style={{ backgroundColor: "#fee2e2", color: "#ef4444" }}>
+          <span key={f} className="format-badge ml-1" style={{ backgroundColor: "var(--accent-pink-soft)", color: "var(--accent-pink)" }}>
             {f}
           </span>
         ))}
