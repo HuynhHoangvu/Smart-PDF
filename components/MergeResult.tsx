@@ -30,6 +30,7 @@ export default function MergeResult({ blob, initialName = "merged", onRestart }:
   const [numPages, setNumPages] = useState<number | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exportingDocx, setExportingDocx] = useState(false);
+  const [exportingImage, setExportingImage] = useState<"png" | "jpg" | null>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const [objectUrl] = useState(() => URL.createObjectURL(blob));
   const [exportError, setExportError] = useState("");
@@ -74,6 +75,33 @@ export default function MergeResult({ blob, initialName = "merged", onRestart }:
       setExportError("Xuất DOCX thất bại: " + (err as Error).message);
     } finally {
       setExportingDocx(false);
+    }
+  };
+
+  const handleExportImage = async (fmt: "png" | "jpg") => {
+    setShowExportMenu(false);
+    setExportingImage(fmt);
+    setExportError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", blob, (fileName || "merged") + ".pdf");
+      formData.append("dpi", "200");
+      formData.append("fmt", fmt);
+      const res = await fetch(`/api/pdf-to-images`, { method: "POST", body: formData });
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail || "Chuyển đổi thất bại");
+      const data = await res.json();
+      for (const img of data.images as { page: number; data: string; mime: string; ext: string }[]) {
+        const a = document.createElement("a");
+        a.href = `data:${img.mime};base64,${img.data}`;
+        a.download = `${fileName || "merged"}_page${img.page}.${img.ext}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+    } catch (err) {
+      setExportError("Xuất ảnh thất bại: " + (err as Error).message);
+    } finally {
+      setExportingImage(null);
     }
   };
 
@@ -157,9 +185,9 @@ export default function MergeResult({ blob, initialName = "merged", onRestart }:
           <button
             className="btn btn-outline result-export-btn"
             onClick={() => setShowExportMenu((v) => !v)}
-            disabled={exportingDocx}
+            disabled={exportingDocx || !!exportingImage}
           >
-            {exportingDocx ? (
+            {exportingDocx || exportingImage ? (
               <>
                 <Loader2 size={14} className="spin" /> Đang xuất...
               </>
@@ -225,6 +253,48 @@ export default function MergeResult({ blob, initialName = "merged", onRestart }:
                 onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
               >
                 <span style={{ fontSize: 18 }}>📝</span> Word (.docx)
+              </button>
+              <button
+                onClick={() => handleExportImage("png")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  width: "100%",
+                  padding: "10px 16px",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 14,
+                  color: "#1e293b",
+                  textAlign: "left",
+                  borderTop: "1px solid #f1f5f9",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+              >
+                <span style={{ fontSize: 18 }}>🖼️</span> Ảnh PNG (mỗi trang 1 file)
+              </button>
+              <button
+                onClick={() => handleExportImage("jpg")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  width: "100%",
+                  padding: "10px 16px",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 14,
+                  color: "#1e293b",
+                  textAlign: "left",
+                  borderTop: "1px solid #f1f5f9",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+              >
+                <span style={{ fontSize: 18 }}>🖼️</span> Ảnh JPG (mỗi trang 1 file)
               </button>
             </div>
           )}
