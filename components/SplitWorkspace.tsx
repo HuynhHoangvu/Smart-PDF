@@ -213,7 +213,7 @@ export default function SplitWorkspace({ initialFiles, onCancel }: SplitWorkspac
           <Scissors size={16} style={{ marginRight: 6 }} />
           <span style={{ fontSize: 14, fontWeight: 600 }}>{file.name}</span>
           {numPages && (
-            <span style={{ fontSize: 13, color: "#718096", marginLeft: 10 }}>
+            <span style={{ fontSize: 13, color: "var(--text-light)", marginLeft: 10 }}>
               Giữ {keptCount}/{numPages} trang{removedCount > 0 ? ` · đã xóa ${removedCount}` : ""}
             </span>
           )}
@@ -258,7 +258,7 @@ export default function SplitWorkspace({ initialFiles, onCancel }: SplitWorkspac
           <input type="checkbox" checked={allChecked} onChange={toggleCheckAll} />
           <span>{checkedCount > 0 ? `Đã chọn ${checkedCount} trang` : "Giữ Shift khi chọn để chọn nhiều trang liên tiếp · Kéo thẻ trang để đổi vị trí"}</span>
         </label>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#4a5568" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text-light)" }}>
           <span>Xóa từ trang</span>
           <input
             type="number"
@@ -290,7 +290,7 @@ export default function SplitWorkspace({ initialFiles, onCancel }: SplitWorkspac
               <PdfRenderer file={fileUrl!} pageNum={1} width={100} onDocumentLoad={onDocumentLoad} />
             </div>
             <Loader2 size={16} className="spin" />
-            <span style={{ fontSize: 13, color: "#718096" }}>Đang tải trang PDF...</span>
+            <span style={{ fontSize: 13, color: "var(--text-light)" }}>Đang tải trang PDF...</span>
           </div>
         )}
         {pages.map((p) => (

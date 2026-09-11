@@ -86,8 +86,8 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
         <div style={{ width: 64, height: 64, background: "#fff5f5", color: "#e53e3e", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
           <Minimize2 size={32} />
         </div>
-        <h3 style={{ fontSize: 19, fontWeight: 700, color: "#2d3748", marginBottom: 8 }}>File không hợp lệ!</h3>
-        <p style={{ fontSize: 13, color: "#718096", wordBreak: "break-all", marginBottom: 16 }}>
+        <h3 style={{ fontSize: 19, fontWeight: 700, color: "var(--text-dark)", marginBottom: 8 }}>File không hợp lệ!</h3>
+        <p style={{ fontSize: 13, color: "var(--text-light)", wordBreak: "break-all", marginBottom: 16 }}>
           File: <strong>{file.name}</strong>
         </p>
         <p style={{ fontSize: 14, color: "#e53e3e", marginBottom: 24 }}>
@@ -177,12 +177,12 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
     return (
       <div style={{ maxWidth: 500, margin: "80px auto", padding: 30, background: "#fff", borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", textAlign: "center" }}>
         <Loader2 size={40} className="spin" style={{ color: "#3182ce", animation: "spin 1.5s linear infinite", margin: "0 auto 20px" }} />
-        <h3 style={{ fontSize: 18, fontWeight: 600, color: "#2d3748", marginBottom: 8 }}>Đang tối ưu dung lượng PDF...</h3>
-        <p style={{ fontSize: 13, color: "#718096", wordBreak: "break-all", marginBottom: 24 }}>{file.name}</p>
+        <h3 style={{ fontSize: 18, fontWeight: 600, color: "var(--text-dark)", marginBottom: 8 }}>Đang tối ưu dung lượng PDF...</h3>
+        <p style={{ fontSize: 13, color: "var(--text-light)", wordBreak: "break-all", marginBottom: 24 }}>{file.name}</p>
         <div style={{ width: "100%", height: 10, background: "#edf2f7", borderRadius: 5, overflow: "hidden", marginBottom: 12 }}>
           <div style={{ width: `${progress}%`, height: "100%", background: "linear-gradient(90deg, #3182ce, #319795)", transition: "width 0.2s ease-out", borderRadius: 5 }} />
         </div>
-        <div style={{ fontSize: 14, color: "#4a5568", fontWeight: 500 }}>{progress}%</div>
+        <div style={{ fontSize: 14, color: "var(--text-light)", fontWeight: 500 }}>{progress}%</div>
       </div>
     );
   }
@@ -193,17 +193,17 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
         <div style={{ width: 64, height: 64, background: "#e6fffa", color: "#319795", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
           <Minimize2 size={32} />
         </div>
-        <h3 style={{ fontSize: 19, fontWeight: 700, color: "#2d3748", marginBottom: 8 }}>Tối ưu dung lượng hoàn tất!</h3>
-        <p style={{ fontSize: 13, color: "#718096", wordBreak: "break-all", marginBottom: 24 }}>{file.name}</p>
+        <h3 style={{ fontSize: 19, fontWeight: 700, color: "var(--text-dark)", marginBottom: 8 }}>Tối ưu dung lượng hoàn tất!</h3>
+        <p style={{ fontSize: 13, color: "var(--text-light)", wordBreak: "break-all", marginBottom: 24 }}>{file.name}</p>
 
         <div style={{ background: "#f7fafc", padding: 20, borderRadius: 8, display: "flex", justifyContent: "space-around", alignItems: "center", marginBottom: 24 }}>
           <div>
-            <span style={{ display: "block", fontSize: 12, color: "#718096" }}>Dung lượng gốc</span>
-            <strong style={{ fontSize: 16, color: "#4a5568" }}>{formatSize(result.originalSize)}</strong>
+            <span style={{ display: "block", fontSize: 12, color: "var(--text-light)" }}>Dung lượng gốc</span>
+            <strong style={{ fontSize: 16, color: "var(--text-light)" }}>{formatSize(result.originalSize)}</strong>
           </div>
           <div style={{ height: 30, width: 1, background: "#e2e8f0" }} />
           <div>
-            <span style={{ display: "block", fontSize: 12, color: "#718096" }}>Dung lượng nén</span>
+            <span style={{ display: "block", fontSize: 12, color: "var(--text-light)" }}>Dung lượng nén</span>
             <strong style={{ fontSize: 16, color: "#2b6cb0" }}>{formatSize(result.compressedSize)}</strong>
           </div>
           <div style={{ height: 30, width: 1, background: "#e2e8f0" }} />
@@ -238,7 +238,7 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
     return (
       <div style={{ maxWidth: 500, margin: "80px auto", padding: 30, background: "#fff", borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", textAlign: "center" }}>
         <h3 style={{ color: "#e53e3e", marginBottom: 12 }}>Lỗi tối ưu dung lượng</h3>
-        <p style={{ color: "#4a5568", marginBottom: 24 }}>{errorMsg}</p>
+        <p style={{ color: "var(--text-light)", marginBottom: 24 }}>{errorMsg}</p>
         <button className="btn btn-outline" onClick={() => setStatus("idle")}>
           Thử lại
         </button>
@@ -261,7 +261,7 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
     const savingsPct = Math.round(((file.size - e.size) / file.size) * 100);
     return (
       <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", whiteSpace: "nowrap" }}>
-        <strong style={{ fontSize: 14, color: "#2d3748" }}>{formatSize(e.size)}</strong>
+        <strong style={{ fontSize: 14, color: "var(--text-dark)" }}>{formatSize(e.size)}</strong>
         <span style={{ fontSize: 11, color: savingsPct > 0 ? "#38a169" : "#a0aec0" }}>{savingsPct > 0 ? `-${savingsPct}%` : "không giảm"}</span>
       </span>
     );
@@ -269,9 +269,9 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
 
   return (
     <div style={{ maxWidth: 550, margin: "60px auto", padding: 30, background: "#fff", borderRadius: 12, boxShadow: "0 4px 25px rgba(0,0,0,0.06)" }}>
-      <h3 style={{ fontSize: 19, fontWeight: 700, color: "#2d3748", textAlign: "center", marginBottom: 6 }}>Nén dung lượng PDF</h3>
-      <p style={{ fontSize: 13, color: "#718096", textAlign: "center", marginBottom: 24 }}>
-        Tải lên: <strong style={{ color: "#4a5568" }}>{file.name}</strong> ({formatSize(file.size)})
+      <h3 style={{ fontSize: 19, fontWeight: 700, color: "var(--text-dark)", textAlign: "center", marginBottom: 6 }}>Nén dung lượng PDF</h3>
+      <p style={{ fontSize: 13, color: "var(--text-light)", textAlign: "center", marginBottom: 24 }}>
+        Tải lên: <strong style={{ color: "var(--text-light)" }}>{file.name}</strong> ({formatSize(file.size)})
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 30 }}>
@@ -295,8 +295,8 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
             <Settings size={22} />
           </div>
           <div style={{ flex: 1 }}>
-            <strong style={{ display: "block", fontSize: 15, color: "#2d3748" }}>Nén vừa (Khuyên dùng)</strong>
-            <span style={{ fontSize: 12, color: "#718096" }}>Giảm kích thước đáng kể nhưng vẫn đảm bảo chữ viết cực kỳ sắc nét.</span>
+            <strong style={{ display: "block", fontSize: 15, color: "var(--text-dark)" }}>Nén vừa (Khuyên dùng)</strong>
+            <span style={{ fontSize: 12, color: "var(--text-light)" }}>Giảm kích thước đáng kể nhưng vẫn đảm bảo chữ viết cực kỳ sắc nét.</span>
           </div>
           {estimateBadge("medium")}
         </label>
@@ -321,8 +321,8 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
             <Zap size={22} />
           </div>
           <div style={{ flex: 1 }}>
-            <strong style={{ display: "block", fontSize: 15, color: "#2d3748" }}>Nén cực mạnh</strong>
-            <span style={{ fontSize: 12, color: "#718096" }}>Giảm dung lượng xuống mức tối đa (thích hợp để up lên các trang web nộp hồ sơ giới hạn dung lượng thấp).</span>
+            <strong style={{ display: "block", fontSize: 15, color: "var(--text-dark)" }}>Nén cực mạnh</strong>
+            <span style={{ fontSize: 12, color: "var(--text-light)" }}>Giảm dung lượng xuống mức tối đa (thích hợp để up lên các trang web nộp hồ sơ giới hạn dung lượng thấp).</span>
           </div>
           {estimateBadge("extreme")}
         </label>
@@ -347,8 +347,8 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
             <Zap size={22} />
           </div>
           <div style={{ flex: 1 }}>
-            <strong style={{ display: "block", fontSize: 15, color: "#2d3748" }}>Nén siêu tối ưu (Target ~2MB)</strong>
-            <span style={{ fontSize: 12, color: "#718096" }}>Giảm dung lượng tối đa, phù hợp khi cần file dưới 3MB để upload lên website.</span>
+            <strong style={{ display: "block", fontSize: 15, color: "var(--text-dark)" }}>Nén siêu tối ưu (Target ~2MB)</strong>
+            <span style={{ fontSize: 12, color: "var(--text-light)" }}>Giảm dung lượng tối đa, phù hợp khi cần file dưới 3MB để upload lên website.</span>
           </div>
           {estimateBadge("ultra")}
         </label>

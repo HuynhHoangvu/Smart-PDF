@@ -140,12 +140,12 @@ export default function PdfToWordWorkspace() {
     return (
       <div style={{ maxWidth: 500, margin: "80px auto", padding: 36, background: "#fff", borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", textAlign: "center" }}>
         <Loader2 size={44} style={{ color: "#0062ff", margin: "0 auto 20px", display: "block", animation: "spin 1.5s linear infinite" }} />
-        <h3 style={{ fontSize: 18, fontWeight: 600, color: "#2d3748", marginBottom: 6 }}>Đang chuyển đổi PDF sang Word...</h3>
-        <p style={{ fontSize: 13, color: "#718096", wordBreak: "break-all", marginBottom: 28 }}>{file?.name}</p>
+        <h3 style={{ fontSize: 18, fontWeight: 600, color: "var(--text-dark)", marginBottom: 6 }}>Đang chuyển đổi PDF sang Word...</h3>
+        <p style={{ fontSize: 13, color: "var(--text-light)", wordBreak: "break-all", marginBottom: 28 }}>{file?.name}</p>
         <div style={{ width: "100%", height: 10, background: "#edf2f7", borderRadius: 5, overflow: "hidden", marginBottom: 10 }}>
           <div style={{ width: `${progress}%`, height: "100%", background: "linear-gradient(90deg,#0062ff,#00c6ff)", transition: "width 0.25s ease-out", borderRadius: 5 }} />
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#4a5568", fontWeight: 500 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--text-light)", fontWeight: 500 }}>
           <span>{loadingStep}</span>
           <span>{progress}%</span>
         </div>
@@ -158,7 +158,7 @@ export default function PdfToWordWorkspace() {
       <div style={{ maxWidth: 500, margin: "80px auto", padding: 36, background: "#fff", borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", textAlign: "center" }}>
         <AlertCircle size={48} style={{ color: "#e53e3e", margin: "0 auto 16px" }} />
         <h3 style={{ fontSize: 18, fontWeight: 600, color: "#e53e3e", marginBottom: 8 }}>Chuyển đổi thất bại</h3>
-        <p style={{ fontSize: 13, color: "#4a5568", marginBottom: 24 }}>{errorMsg}</p>
+        <p style={{ fontSize: 13, color: "var(--text-light)", marginBottom: 24 }}>{errorMsg}</p>
         <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
           <button className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={() => convert(file)}>
             <RefreshCw size={15} /> Thử lại
@@ -176,16 +176,16 @@ export default function PdfToWordWorkspace() {
         <CheckCircle2 size={38} />
       </div>
 
-      <h3 style={{ fontSize: 20, fontWeight: 700, color: "#1a202c", marginBottom: 4 }}>Chuyển đổi thành công!</h3>
-      <p style={{ fontSize: 13, color: "#718096", marginBottom: 24, wordBreak: "break-all" }}>{file?.name}</p>
+      <h3 style={{ fontSize: 20, fontWeight: 700, color: "var(--text-dark)", marginBottom: 4 }}>Chuyển đổi thành công!</h3>
+      <p style={{ fontSize: 13, color: "var(--text-light)", marginBottom: 24, wordBreak: "break-all" }}>{file?.name}</p>
 
       <div style={{ background: "#f7fafc", borderRadius: 10, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, marginBottom: 28, textAlign: "left" }}>
         <div style={{ width: 44, height: 44, background: "#dbeafe", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <FileText size={22} style={{ color: "#2563eb" }} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#2d3748", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{resultName}</div>
-          <div style={{ fontSize: 12, color: "#718096", marginTop: 3 }}>Microsoft Word (.docx) · {formatSize(resultBlob?.size)}</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-dark)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{resultName}</div>
+          <div style={{ fontSize: 12, color: "var(--text-light)", marginTop: 3 }}>Microsoft Word (.docx) · {formatSize(resultBlob?.size)}</div>
         </div>
       </div>
 

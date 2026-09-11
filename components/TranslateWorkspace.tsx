@@ -93,7 +93,7 @@ function HtmlTranslatedPage({
         className="translated-page-content translated-page-content-editable"
         contentEditable={true}
         suppressContentEditableWarning={true}
-        style={{ fontFamily: '"Times New Roman", Times, serif', color: "#1a202c" }}
+        style={{ fontFamily: '"Times New Roman", Times, serif', color: "var(--text-dark)" }}
         onBlur={(e) => onHtmlEdit(pageNum, e.currentTarget.innerHTML)}
         dangerouslySetInnerHTML={{ __html: html }}
       />
@@ -111,7 +111,7 @@ function TranslatedPage({
   onBlockEdit: (pageNum: number, blockIdx: number, newText: string, rIdx?: number, cIdx?: number) => void;
 }) {
   return (
-    <div className="translated-page-content" style={{ fontFamily: '"Times New Roman", Times, serif', color: "#1a202c" }}>
+    <div className="translated-page-content" style={{ fontFamily: '"Times New Roman", Times, serif', color: "var(--text-dark)" }}>
       {(pageData.blocks || []).map((block, i) => {
         if (block.type === "table") {
           const borderless = block.borderless;

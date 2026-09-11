@@ -447,7 +447,7 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
             <span>Chọn tất cả ({files.length} file)</span>
           </label>
           <div className="sub-toolbar-actions" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <label className="select-all-label" style={{ fontSize: 13, color: "#4a5568" }}>
+            <label className="select-all-label" style={{ fontSize: 13, color: "var(--text-light)" }}>
               <input type="checkbox" checked={normalizeToA4} onChange={(e) => setNormalizeToA4(e.target.checked)} />
               <span>Chuẩn hóa kích thước A4</span>
             </label>
@@ -468,7 +468,7 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
       {viewMode === "files" && files.length === 0 && isProcessingAdd && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: 30, justifyContent: "center" }}>
           <Loader2 size={16} className="spin" />
-          <span style={{ fontSize: 13, color: "#718096" }}>Đang xử lý file...</span>
+          <span style={{ fontSize: 13, color: "var(--text-light)" }}>Đang xử lý file...</span>
         </div>
       )}
 

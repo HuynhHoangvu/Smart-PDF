@@ -71,7 +71,7 @@ export default function PdfToImageWorkspace({ initialFiles, onCancel }: PdfToIma
           <Upload size={14} style={{ marginRight: 6 }} /> Chọn file PDF
         </button>
         <input ref={inputRef} type="file" accept=".pdf" hidden onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
-        {file && <span style={{ fontSize: 13, color: "#4a5568" }}>{file.name}</span>}
+        {file && <span style={{ fontSize: 13, color: "var(--text-light)" }}>{file.name}</span>}
       </div>
 
       <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
@@ -124,7 +124,7 @@ export default function PdfToImageWorkspace({ initialFiles, onCancel }: PdfToIma
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={`data:${img.mime};base64,${img.data}`} alt={`Trang ${img.page}`} style={{ width: "100%", display: "block" }} />
               <div style={{ padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 12, color: "#718096" }}>Trang {img.page}</span>
+                <span style={{ fontSize: 12, color: "var(--text-light)" }}>Trang {img.page}</span>
                 <a
                   href={`data:${img.mime};base64,${img.data}`}
                   download={`${file!.name.replace(/\.pdf$/i, "")}_page${img.page}.${img.ext}`}

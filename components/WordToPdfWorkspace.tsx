@@ -90,7 +90,7 @@ export default function WordToPdfWorkspace({ initialFiles, onCancel }: WordToPdf
     return (
       <div style={{ maxWidth: 500, margin: "80px auto", padding: 30, background: "#fff", borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", textAlign: "center" }}>
         <FileWarning size={48} style={{ color: "#e53e3e", margin: "0 auto 16px" }} />
-        <h3 style={{ fontSize: 18, color: "#2d3748", marginBottom: 8 }}>File không hợp lệ</h3>
+        <h3 style={{ fontSize: 18, color: "var(--text-dark)", marginBottom: 8 }}>File không hợp lệ</h3>
         <p style={{ color: "#e53e3e", marginBottom: 20 }}>
           Chỉ hỗ trợ file <strong>.docx / .doc</strong>
         </p>
@@ -104,8 +104,8 @@ export default function WordToPdfWorkspace({ initialFiles, onCancel }: WordToPdf
     return (
       <div style={{ maxWidth: 500, margin: "80px auto", padding: 36, background: "#fff", borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", textAlign: "center" }}>
         <Loader2 size={44} style={{ color: "#0062ff", margin: "0 auto 20px", display: "block", animation: "spin 1.5s linear infinite" }} />
-        <h3 style={{ fontSize: 18, fontWeight: 600, color: "#2d3748", marginBottom: 6 }}>Đang chuyển đổi Word sang PDF...</h3>
-        <p style={{ fontSize: 13, color: "#718096", wordBreak: "break-all" }}>{file.name}</p>
+        <h3 style={{ fontSize: 18, fontWeight: 600, color: "var(--text-dark)", marginBottom: 6 }}>Đang chuyển đổi Word sang PDF...</h3>
+        <p style={{ fontSize: 13, color: "var(--text-light)", wordBreak: "break-all" }}>{file.name}</p>
       </div>
     );
 
@@ -114,7 +114,7 @@ export default function WordToPdfWorkspace({ initialFiles, onCancel }: WordToPdf
       <div style={{ maxWidth: 500, margin: "80px auto", padding: 36, background: "#fff", borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", textAlign: "center" }}>
         <AlertCircle size={48} style={{ color: "#e53e3e", margin: "0 auto 16px" }} />
         <h3 style={{ fontSize: 18, fontWeight: 600, color: "#e53e3e", marginBottom: 8 }}>Chuyển đổi thất bại</h3>
-        <p style={{ fontSize: 13, color: "#4a5568", marginBottom: 24 }}>{error}</p>
+        <p style={{ fontSize: 13, color: "var(--text-light)", marginBottom: 24 }}>{error}</p>
         <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
           <button className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={() => convert()}>
             <RefreshCw size={15} /> Thử lại
@@ -147,8 +147,8 @@ export default function WordToPdfWorkspace({ initialFiles, onCancel }: WordToPdf
               <FileOutput size={18} style={{ color: "var(--accent-pink)" }} />
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#1a202c", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 320 }}>{resultFilename}</div>
-              <div style={{ fontSize: 12, color: "#718096" }}>{formatSize(resultBlob?.size)} · PDF Document</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-dark)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 320 }}>{resultFilename}</div>
+              <div style={{ fontSize: 12, color: "var(--text-light)" }}>{formatSize(resultBlob?.size)} · PDF Document</div>
             </div>
           </div>
 
@@ -196,9 +196,9 @@ export default function WordToPdfWorkspace({ initialFiles, onCancel }: WordToPdf
   return (
     <div style={{ maxWidth: 500, margin: "60px auto", padding: 36, background: "#fff", borderRadius: 12, boxShadow: "0 4px 25px rgba(0,0,0,0.06)", textAlign: "center" }}>
       <FileOutput size={40} color="#dc2626" style={{ margin: "0 auto 16px" }} />
-      <h3 style={{ fontSize: 19, fontWeight: 700, color: "#2d3748", marginBottom: 6 }}>Word sang PDF</h3>
-      <p style={{ fontSize: 13, color: "#718096", marginBottom: 24 }}>
-        File: <strong style={{ color: "#4a5568" }}>{file.name}</strong> ({formatSize(file.size)})
+      <h3 style={{ fontSize: 19, fontWeight: 700, color: "var(--text-dark)", marginBottom: 6 }}>Word sang PDF</h3>
+      <p style={{ fontSize: 13, color: "var(--text-light)", marginBottom: 24 }}>
+        File: <strong style={{ color: "var(--text-light)" }}>{file.name}</strong> ({formatSize(file.size)})
       </p>
       <div style={{ display: "flex", gap: 12, justifyContent: "center", marginBottom: 16 }}>
         <button className="btn btn-primary" style={{ padding: "10px 28px", fontSize: 14 }} onClick={() => convert()}>

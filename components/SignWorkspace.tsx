@@ -101,7 +101,7 @@ export default function SignWorkspace() {
     const ctx = canvas.getContext("2d")!;
     const point = getCanvasPoint(e);
     const last = lastPointRef.current!;
-    ctx.strokeStyle = "#1a202c";
+    ctx.strokeStyle = "var(--text-dark)";
     ctx.lineWidth = 3;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
@@ -297,7 +297,7 @@ export default function SignWorkspace() {
     return (
       <div style={{ maxWidth: 500, margin: "80px auto", padding: 36, background: "#fff", borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", textAlign: "center" }}>
         <Loader2 size={44} style={{ color: "#0062ff", margin: "0 auto 20px", display: "block", animation: "spin 1.5s linear infinite" }} />
-        <h3 style={{ fontSize: 18, fontWeight: 600, color: "#2d3748" }}>Đang chuyển sang PDF để ký...</h3>
+        <h3 style={{ fontSize: 18, fontWeight: 600, color: "var(--text-dark)" }}>Đang chuyển sang PDF để ký...</h3>
       </div>
     );
   }
@@ -349,7 +349,7 @@ export default function SignWorkspace() {
       )}
 
       {signature && sigRect && sigRect.page === currentPage && (
-        <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "#4a5568", flexWrap: "wrap" }}>
+        <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--text-light)", flexWrap: "wrap" }}>
           <Move size={14} /> Kéo để di chuyển, kéo góc dưới phải để đổi kích thước.
           <button
             className="btn btn-outline"
@@ -365,7 +365,7 @@ export default function SignWorkspace() {
       )}
 
       {signature && sigRect && sigRect.page !== currentPage && (
-        <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "#4a5568", flexWrap: "wrap" }}>
+        <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--text-light)", flexWrap: "wrap" }}>
           Chữ ký hiện đang ở trang {sigRect.page}.
           <button className="btn btn-primary" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => placeOnPage(currentPage)}>
             <PenLine size={12} style={{ marginRight: 4 }} /> Đặt vào trang này
@@ -387,7 +387,7 @@ export default function SignWorkspace() {
         <button className="btn btn-outline" style={{ padding: "6px 10px" }} disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>
           <ChevronLeft size={14} />
         </button>
-        <span style={{ fontSize: 13, color: "#4a5568" }}>
+        <span style={{ fontSize: 13, color: "var(--text-light)" }}>
           Trang {currentPage} / {numPages || "…"}
         </span>
         <button className="btn btn-outline" style={{ padding: "6px 10px" }} disabled={currentPage >= numPages} onClick={() => setCurrentPage((p) => Math.min(numPages, p + 1))}>
@@ -477,7 +477,7 @@ export default function SignWorkspace() {
               </>
             ) : (
               <>
-                <p style={{ fontSize: 13, color: "#718096", marginBottom: 12 }}>
+                <p style={{ fontSize: 13, color: "var(--text-light)", marginBottom: 12 }}>
                   Chụp/scan chữ ký viết trên giấy trắng — nền trắng sẽ tự động được xóa để chỉ còn nét ký.
                 </p>
                 <FileDropzone accept="image/*" formats={["PNG", "JPG"]} onFiles={handleSignatureUpload} />

@@ -231,7 +231,7 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
           <Upload size={14} style={{ marginRight: 6 }} /> Chọn ảnh
         </button>
         <input ref={inputRef} type="file" accept={accept} multiple={multi} hidden onChange={(e) => e.target.files && handleFiles(e.target.files)} />
-        <span style={{ fontSize: 13, color: "#4a5568" }}>{files.length} file đã chọn</span>
+        <span style={{ fontSize: 13, color: "var(--text-light)" }}>{files.length} file đã chọn</span>
       </div>
 
       {mode === "convert" && (
@@ -289,7 +289,7 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
                   minWidth: 120,
                 }}
               >
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#2d3748" }}>{LEVEL_LABEL[lvl]}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-dark)" }}>{LEVEL_LABEL[lvl]}</div>
                 {!e || e.status === "loading" ? (
                   <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#a0aec0" }}>
                     <Loader2 size={10} className="spin" /> Đang tính...
@@ -298,7 +298,7 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
                   <div style={{ fontSize: 11, color: "#a0aec0" }}>Không tính được</div>
                 ) : (
                   <div style={{ fontSize: 11 }}>
-                    <span style={{ color: "#2d3748", fontWeight: 600 }}>{formatBytes(e.size)}</span>{" "}
+                    <span style={{ color: "var(--text-dark)", fontWeight: 600 }}>{formatBytes(e.size)}</span>{" "}
                     <span style={{ color: files[0].size > e.size ? "#38a169" : "#a0aec0" }}>
                       ({files[0].size > e.size ? `-${Math.round(((files[0].size - e.size) / files[0].size) * 100)}%` : "không giảm"})
                     </span>
@@ -313,7 +313,7 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
       {files.length > 0 && (
         <div style={{ marginBottom: 16, display: "flex", flexWrap: "wrap", gap: 8 }}>
           {files.map((f) => (
-            <div key={f.name} style={{ fontSize: 12, background: "#edf2f7", padding: "4px 10px", borderRadius: 20, color: "#4a5568" }}>
+            <div key={f.name} style={{ fontSize: 12, background: "#edf2f7", padding: "4px 10px", borderRadius: 20, color: "var(--text-light)" }}>
               {f.name}
             </div>
           ))}
