@@ -58,7 +58,7 @@ const buildPageList = (files: FileItem[]): PageItem[] =>
   );
 
 type MergeWorkspaceProps = {
-  initialFiles: File[];
+  initialFiles?: File[];
   onCancel?: () => void;
 };
 

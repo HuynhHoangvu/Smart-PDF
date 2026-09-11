@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { FileDown, RefreshCw, Loader2, Minimize2, Settings, Zap } from "lucide-react";
+import FileDropzone from "./FileDropzone";
 
 type CompressWorkspaceProps = {
-  initialFiles: File[];
+  initialFiles?: File[];
   onCancel?: () => void;
 };
 
@@ -19,16 +20,30 @@ type Result = {
 };
 
 export default function CompressWorkspace({ initialFiles, onCancel }: CompressWorkspaceProps) {
-  const file = initialFiles[0];
+  const [file, setFile] = useState<File | null>(initialFiles?.[0] || null);
   const [level, setLevel] = useState<Level>("medium");
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<Result | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const isPdfFile = file && file.name.toLowerCase().endsWith(".pdf");
+  if (!file) {
+    return (
+      <div style={{ maxWidth: 800, margin: "40px auto", padding: 24 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>Nén PDF</h2>
+        <FileDropzone
+          accept=".pdf,application/pdf"
+          formats={["PDF"]}
+          hint="hoặc kéo thả file PDF vào đây"
+          onFiles={(files) => files[0] && setFile(files[0])}
+        />
+      </div>
+    );
+  }
 
-  if (file && !isPdfFile && status === "idle") {
+  const isPdfFile = file.name.toLowerCase().endsWith(".pdf");
+
+  if (!isPdfFile && status === "idle") {
     return (
       <div style={{ maxWidth: 500, margin: "80px auto", padding: 30, background: "#fff", borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", textAlign: "center" }}>
         <div style={{ width: 64, height: 64, background: "#fff5f5", color: "#e53e3e", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
@@ -42,7 +57,7 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
           Công cụ <strong>Nén PDF</strong> chỉ hỗ trợ file PDF (.pdf).
           <br /> File bạn chọn là <strong>{file.name.split(".").pop()?.toUpperCase()}</strong> - không thể nén được!
         </p>
-        <button className="btn btn-outline" onClick={onCancel}>
+        <button className="btn btn-outline" onClick={() => setFile(null)}>
           Chọn file PDF khác
         </button>
       </div>
@@ -162,7 +177,16 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
           <button className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={downloadFile}>
             <FileDown size={16} /> Tải file đã nén
           </button>
-          <button className="btn btn-outline" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={onCancel}>
+          <button
+            className="btn btn-outline"
+            style={{ display: "flex", alignItems: "center", gap: 6 }}
+            onClick={() => {
+              setFile(null);
+              setResult(null);
+              setStatus("idle");
+              onCancel?.();
+            }}
+          >
             <RefreshCw size={16} /> Nén file khác
           </button>
         </div>
@@ -267,7 +291,14 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
         <button className="btn btn-primary" style={{ padding: "10px 24px" }} onClick={handleCompress}>
           Bắt đầu nén file
         </button>
-        <button className="btn btn-outline" style={{ padding: "10px 24px" }} onClick={onCancel}>
+        <button
+          className="btn btn-outline"
+          style={{ padding: "10px 24px" }}
+          onClick={() => {
+            setFile(null);
+            onCancel?.();
+          }}
+        >
           Hủy bỏ
         </button>
       </div>

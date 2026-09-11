@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Upload, Download, RefreshCw, Loader2, FileOutput, AlertCircle, Eye, FileWarning } from "lucide-react";
+import FileDropzone from "./FileDropzone";
 
 type WordToPdfWorkspaceProps = {
   initialFiles?: File[];
@@ -74,12 +75,14 @@ export default function WordToPdfWorkspace({ initialFiles, onCancel }: WordToPdf
 
   if (!file)
     return (
-      <div style={{ maxWidth: 500, margin: "80px auto", padding: 30, background: "#fff", borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", textAlign: "center" }}>
-        <FileWarning size={48} style={{ color: "#e53e3e", margin: "0 auto 16px" }} />
-        <h3 style={{ fontSize: 18, color: "#2d3748", marginBottom: 8 }}>Chưa chọn file</h3>
-        <button className="btn btn-outline" onClick={onCancel}>
-          Quay lại
-        </button>
+      <div style={{ maxWidth: 800, margin: "40px auto", padding: 24 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>Word sang PDF</h2>
+        <FileDropzone
+          accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          formats={["DOCX", "DOC"]}
+          hint="hoặc kéo thả file Word vào đây"
+          onFiles={(files) => files[0] && handleFile(files[0])}
+        />
       </div>
     );
 
@@ -91,7 +94,7 @@ export default function WordToPdfWorkspace({ initialFiles, onCancel }: WordToPdf
         <p style={{ color: "#e53e3e", marginBottom: 20 }}>
           Chỉ hỗ trợ file <strong>.docx / .doc</strong>
         </p>
-        <button className="btn btn-outline" onClick={onCancel}>
+        <button className="btn btn-outline" onClick={() => handleFile(null)}>
           Chọn file khác
         </button>
       </div>
@@ -116,7 +119,7 @@ export default function WordToPdfWorkspace({ initialFiles, onCancel }: WordToPdf
           <button className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={() => convert()}>
             <RefreshCw size={15} /> Thử lại
           </button>
-          <button className="btn btn-outline" onClick={onCancel}>
+          <button className="btn btn-outline" onClick={() => handleFile(null)}>
             Chọn file khác
           </button>
         </div>
@@ -204,7 +207,7 @@ export default function WordToPdfWorkspace({ initialFiles, onCancel }: WordToPdf
         <button className="btn btn-outline" style={{ padding: "10px 20px", fontSize: 14 }} onClick={() => inputRef.current?.click()}>
           <Upload size={14} style={{ marginRight: 6 }} /> Đổi file
         </button>
-        <button className="btn btn-outline" style={{ padding: "10px 20px", fontSize: 14 }} onClick={onCancel}>
+        <button className="btn btn-outline" style={{ padding: "10px 20px", fontSize: 14 }} onClick={() => handleFile(null)}>
           Hủy
         </button>
       </div>

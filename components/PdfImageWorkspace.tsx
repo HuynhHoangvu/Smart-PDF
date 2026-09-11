@@ -1,9 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { FileText, Image as ImageIcon } from "lucide-react";
 import PdfToImageWorkspace from "./PdfToImageWorkspace";
-import ImageConvertWorkspace from "./ImageConvertWorkspace";
+
+// react-pdf (pulled in via MergeResult) touches the browser-only DOMMatrix
+// global at module-eval time, so it must be excluded from SSR.
+const ImageConvertWorkspace = dynamic(() => import("./ImageConvertWorkspace"), { ssr: false });
 
 type PdfImageWorkspaceProps = {
   initialMode?: "pdf-to-image" | "image-to-pdf";

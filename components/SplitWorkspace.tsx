@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Trash2, RotateCw, Scissors, Download, Loader2, Eye, X, ChevronLeft, ChevronRight, Undo2 } from "lucide-react";
 import PdfRenderer from "./PdfRenderer";
 import MergeResult from "./MergeResult";
+import FileDropzone from "./FileDropzone";
 import { validateFile, CLIENT_SIZE_LIMITS } from "@/lib/clientFileValidation";
 
 type PageItem = {
@@ -15,13 +16,29 @@ type PageItem = {
 };
 
 type SplitWorkspaceProps = {
-  initialFiles: File[];
+  initialFiles?: File[];
   onCancel?: () => void;
 };
 
 export default function SplitWorkspace({ initialFiles, onCancel }: SplitWorkspaceProps) {
-  const [file] = useState<File | null>(initialFiles?.[0] || null);
-  const [fileUrl] = useState<string | null>(() => (file ? URL.createObjectURL(file) : null));
+  const [file, setFile] = useState<File | null>(initialFiles?.[0] || null);
+  const [fileUrl, setFileUrl] = useState<string | null>(() => (file ? URL.createObjectURL(file) : null));
+
+  useEffect(() => {
+    return () => {
+      if (fileUrl) URL.revokeObjectURL(fileUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleFile = (f: File) => {
+    if (fileUrl) URL.revokeObjectURL(fileUrl);
+    setFile(f);
+    setFileUrl(URL.createObjectURL(f));
+    setPages([]);
+    setNumPages(null);
+    setError("");
+  };
   const [pages, setPages] = useState<PageItem[]>([]);
   const [numPages, setNumPages] = useState<number | null>(null);
   const [previewPage, setPreviewPage] = useState<number | null>(null);
@@ -157,7 +174,19 @@ export default function SplitWorkspace({ initialFiles, onCancel }: SplitWorkspac
     );
   }
 
-  if (!file) return null;
+  if (!file) {
+    return (
+      <div style={{ maxWidth: 800, margin: "40px auto", padding: 24 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>Cắt PDF</h2>
+        <FileDropzone
+          accept=".pdf,application/pdf"
+          formats={["PDF"]}
+          hint="hoặc kéo thả file PDF vào đây"
+          onFiles={(files) => files[0] && handleFile(files[0])}
+        />
+      </div>
+    );
+  }
 
   const fileCheck = validateFile(file, {
     maxSizeBytes: CLIENT_SIZE_LIMITS.pdf,
@@ -168,7 +197,7 @@ export default function SplitWorkspace({ initialFiles, onCancel }: SplitWorkspac
     return (
       <div style={{ textAlign: "center", marginTop: 60 }}>
         <p style={{ color: "#e53e3e", marginBottom: 16 }}>{fileCheck.message}</p>
-        <button className="btn btn-outline" onClick={onCancel}>
+        <button className="btn btn-outline" onClick={() => setFile(null)}>
           Chọn file khác
         </button>
       </div>
@@ -195,7 +224,14 @@ export default function SplitWorkspace({ initialFiles, onCancel }: SplitWorkspac
         </div>
         <div className="toolbar-right" style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {error && <span style={{ color: "#e53e3e", fontSize: 13 }}>{error}</span>}
-          <button className="btn btn-outline" onClick={onCancel} style={{ fontSize: 14 }}>
+          <button
+            className="btn btn-outline"
+            onClick={() => {
+              setFile(null);
+              onCancel?.();
+            }}
+            style={{ fontSize: 14 }}
+          >
             Hủy
           </button>
           <button
