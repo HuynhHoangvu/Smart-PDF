@@ -132,7 +132,7 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
 
   if (files.length === 0) {
     return (
-      <div style={{ maxWidth: 600, margin: "40px auto", padding: 24 }}>
+      <div style={{ width: "100%", maxWidth: 600, margin: "40px auto", padding: 24 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>{title}</h2>
         <div
           className={`dropzone ${dragging ? "active" : ""}`}
@@ -163,7 +163,7 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
   }
 
   return (
-    <div style={{ maxWidth: 600, margin: "40px auto", padding: 24 }}>
+    <div style={{ width: "100%", maxWidth: 600, margin: "40px auto", padding: 24 }}>
       <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>{title}</h2>
 
       <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 20, flexWrap: "wrap" }}>

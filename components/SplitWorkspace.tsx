@@ -176,7 +176,7 @@ export default function SplitWorkspace({ initialFiles, onCancel }: SplitWorkspac
 
   if (!file) {
     return (
-      <div style={{ maxWidth: 800, margin: "40px auto", padding: 24 }}>
+      <div style={{ width: "100%", maxWidth: 800, margin: "40px auto", padding: 24 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>Cắt PDF</h2>
         <FileDropzone
           accept=".pdf,application/pdf"

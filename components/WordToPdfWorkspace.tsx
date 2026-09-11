@@ -75,7 +75,7 @@ export default function WordToPdfWorkspace({ initialFiles, onCancel }: WordToPdf
 
   if (!file)
     return (
-      <div style={{ maxWidth: 800, margin: "40px auto", padding: 24 }}>
+      <div style={{ width: "100%", maxWidth: 800, margin: "40px auto", padding: 24 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>Word sang PDF</h2>
         <FileDropzone
           accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
