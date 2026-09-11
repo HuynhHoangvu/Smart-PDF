@@ -1,31 +1,30 @@
 :root {
-  /* Primary CTA color — the same warm brown used for icons/accents
-     everywhere else, replacing the old blue which clashed with the
-     cream/brown theme (and the pink that came before this, per feedback). */
+  /* Exact spec from the user — see chat: warm-brown sidebar with ivory
+     text, petal-pink only on hover/active; cream content area with
+     dark-brown headings; white tool cards with warm-brown icons. */
   --primary: #8a5a2b;
   --primary-hover: #6e4620;
-  /* Palette lifted straight from the logo badge: cream background,
-     dark-brown text, exactly like "GIÁN CATHOLIC GLOBAL" is printed on it —
-     instead of the generic blue-gray/slate this app started with. */
-  --bg-color: #f9f2df;
-  --surface: #f9f2df;
-  --text-dark: #433222;
+  --bg-color: #f5f0e0;
+  --surface: #ffffff;
+  --text-dark: #5c4d44;
   --text-light: #8a7358;
   --border-color: #e6dcc2;
   --danger: #e53e3e;
   --success: #38a169;
   --warning: #d69e2e;
-  --sidebar-bg: #f2e7c9;
-  --sidebar-text: #8a7358;
-  --sidebar-hover: #ecdcb4;
-  --sidebar-active: #e3cfa0;
+
+  --sidebar-bg: #8c7a6b;
+  --sidebar-text: #fbf7e6;
+  --sidebar-hover: #7d6c5e;
+  --sidebar-active: #6e5f53;
+  --sidebar-accent: #f1a7a3;
 
   /* Neumorphic (soft-UI) shadow system — light source top-left, so the
      "dark" shadow sits bottom-right and the "light" one top-left, matching
      the two-shadow technique from neu-css (github.com/PedroLimaSilva/neu-css):
      base color ± ~10% lightness, blur ≈ 2× the offset distance. */
   --neu-light: #ffffff;
-  --neu-dark: #cec4a6;
+  --neu-dark: #d9cfb6;
   --neu-radius: 18px;
   --neu-radius-sm: 12px;
   --neu-distance: 8px;
@@ -37,14 +36,14 @@
 
   /* One shared warm-brown accent for every icon/badge — replaces the
      grab-bag of bright per-tool colors so the whole app reads as one
-     coherent (neumorphic) palette instead of a rainbow of icon chips.
-     (Named "pink" from an earlier pass; now holds the brown the theme
-     settled on — kept the name to avoid touching every call site.) */
-  --accent-pink: #8a5a2b;
-  --accent-pink-soft: #ecdfc4;
+     coherent palette instead of a rainbow of icon chips. (Named "pink"
+     from an earlier pass; now holds the warm brown the theme settled on
+     — kept the name to avoid touching every call site.) */
+  --accent-pink: #8c7a6b;
+  --accent-pink-soft: #f0ece7;
 
-  --sidebar-neu-dark: #d3bf8e;
-  --sidebar-neu-light: #ffffff;
+  --sidebar-neu-dark: #6e5f53;
+  --sidebar-neu-light: #a08d7c;
   --sidebar-neu-raised: 6px 6px 12px var(--sidebar-neu-dark), -6px -6px 12px var(--sidebar-neu-light);
   --sidebar-neu-pressed: inset 3px 3px 6px var(--sidebar-neu-dark), inset -3px -3px 6px var(--sidebar-neu-light);
 }
@@ -106,7 +105,7 @@ a {
 }
 
 .sidebar-logo-text {
-  color: var(--text-dark);
+  color: var(--sidebar-text);
   font-weight: 700;
   font-size: 13px;
   line-height: 1.25;
@@ -148,18 +147,22 @@ a {
 
 .sidebar-item:hover {
   background-color: var(--sidebar-hover);
-  color: var(--text-dark);
+  color: var(--sidebar-accent);
+}
+
+.sidebar-item:hover .icon {
+  color: var(--sidebar-accent);
 }
 
 .sidebar-item.active, .sidebar-item.open {
-  background-color: var(--sidebar-bg);
-  color: var(--text-dark);
+  background-color: var(--sidebar-active);
+  color: var(--sidebar-accent);
   font-weight: 700;
   box-shadow: var(--sidebar-neu-pressed);
 }
 
 .sidebar-item.active .icon, .sidebar-item.open .icon {
-  color: var(--text-dark);
+  color: var(--sidebar-accent);
 }
 
 .sidebar-item .icon {
@@ -209,17 +212,21 @@ a {
 
 .sidebar-flyout-item:hover {
   background-color: var(--sidebar-hover);
-  color: var(--text-dark);
+  color: var(--sidebar-accent);
+}
+
+.sidebar-flyout-item:hover .icon {
+  color: var(--sidebar-accent);
 }
 
 .sidebar-flyout-item.active {
   background-color: var(--sidebar-hover);
-  color: var(--text-dark);
+  color: var(--sidebar-accent);
   font-weight: 700;
 }
 
 .sidebar-flyout-item.active .icon {
-  color: var(--text-dark);
+  color: var(--sidebar-accent);
 }
 
 .sidebar-flyout-item .icon {
@@ -240,7 +247,7 @@ a {
   border-radius: var(--neu-radius-sm);
   border: none;
   background: var(--sidebar-bg);
-  color: var(--text-dark);
+  color: var(--sidebar-text);
   align-items: center;
   justify-content: center;
   cursor: pointer;
