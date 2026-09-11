@@ -1,15 +1,14 @@
 :root {
   --primary: #0062ff;
   --primary-hover: #0050d0;
-  /* Base tint pulled from the logo's dominant color (the mascot's coral-pink
-     petals, ~#f0a090) — a light wash of it instead of the blue-gray this
-     used to be, so the whole app's background reads as "the same family"
-     as the logo instead of an unrelated color. */
-  --bg-color: #f5e6e1;
-  --surface: #f5e6e1;
-  --text-dark: #2d3748;
-  --text-light: #718096;
-  --border-color: #e2e8f0;
+  /* Palette lifted straight from the logo badge: cream background,
+     dark-brown text, exactly like "GIÁN CATHOLIC GLOBAL" is printed on it —
+     instead of the generic blue-gray/slate this app started with. */
+  --bg-color: #f9f2df;
+  --surface: #f9f2df;
+  --text-dark: #433222;
+  --text-light: #8a7358;
+  --border-color: #e6dcc2;
   --danger: #e53e3e;
   --success: #38a169;
   --warning: #d69e2e;
@@ -23,7 +22,7 @@
      the two-shadow technique from neu-css (github.com/PedroLimaSilva/neu-css):
      base color ± ~10% lightness, blur ≈ 2× the offset distance. */
   --neu-light: #ffffff;
-  --neu-dark: #c9b3ac;
+  --neu-dark: #cec4a6;
   --neu-radius: 18px;
   --neu-radius-sm: 12px;
   --neu-distance: 8px;
@@ -96,19 +95,12 @@ a {
 }
 
 .sidebar-logo-img {
-  width: 56px;
+  width: 72px;
   height: auto;
-  filter: drop-shadow(2px 3px 4px rgba(0, 0, 0, 0.35));
+  border-radius: 14px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
 }
 
-.sidebar-logo-text {
-  color: var(--accent-pink-soft);
-  font-weight: 700;
-  font-size: 13px;
-  line-height: 1.25;
-  text-align: center;
-  max-width: 84px;
-}
 
 .sidebar-menu {
   width: 100%;
@@ -1560,13 +1552,7 @@ a {
     width: 100%;
   }
   .sidebar-logo-img {
-    width: 36px;
-  }
-  .sidebar-logo-text {
-    max-width: none;
-    text-align: left;
-    font-size: 15px;
-    flex: 1;
+    width: 44px;
   }
   .sidebar-close-btn {
     display: flex;
