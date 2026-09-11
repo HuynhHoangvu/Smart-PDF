@@ -1,8 +1,12 @@
 :root {
   --primary: #0062ff;
   --primary-hover: #0050d0;
-  --bg-color: #e8ecf3;
-  --surface: #e8ecf3;
+  /* Base tint pulled from the logo's dominant color (the mascot's coral-pink
+     petals, ~#f0a090) — a light wash of it instead of the blue-gray this
+     used to be, so the whole app's background reads as "the same family"
+     as the logo instead of an unrelated color. */
+  --bg-color: #f5e6e1;
+  --surface: #f5e6e1;
   --text-dark: #2d3748;
   --text-light: #718096;
   --border-color: #e2e8f0;
@@ -19,7 +23,7 @@
      the two-shadow technique from neu-css (github.com/PedroLimaSilva/neu-css):
      base color ± ~10% lightness, blur ≈ 2× the offset distance. */
   --neu-light: #ffffff;
-  --neu-dark: #b7bfcc;
+  --neu-dark: #c9b3ac;
   --neu-radius: 18px;
   --neu-radius-sm: 12px;
   --neu-distance: 8px;
