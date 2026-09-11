@@ -16,6 +16,7 @@ const tools = [
   { id: "split", title: "Cắt", icon: <Scissors size={20} />, color: "#8b5cf6" },
   { id: "pdf-to-word", title: "PDF sang Word", icon: <FileText size={20} />, color: "#3b82f6" },
   { id: "pdf-to-image", title: "PDF sang Hình ảnh", icon: <ImageIcon size={20} />, color: "#f59e0b" },
+  { id: "compress-image", title: "Nén hình ảnh", icon: <ImageIcon size={20} />, color: "#ef4444" },
   { id: "translate", title: "Dịch", icon: <Languages size={20} />, color: "#3b82f6" },
 ];
 

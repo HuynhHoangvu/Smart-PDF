@@ -24,6 +24,7 @@ const menuItems = [
   { id: "pdf-to-word", icon: <FileText size={20} />, label: "PDF → Word", path: "/tool/pdf-to-word" },
   { id: "word-to-pdf", icon: <FileOutput size={20} />, label: "Word → PDF", path: "/tool/word-to-pdf" },
   { id: "pdf-to-image", icon: <ImagePlus size={20} />, label: "PDF ↔ Hình ảnh", path: "/tool/pdf-to-image", altPaths: ["/tool/image-to-pdf"] },
+  { id: "compress-image", icon: <FileArchive size={20} />, label: "Nén hình ảnh", path: "/tool/compress-image" },
   { id: "translate", icon: <Languages size={20} />, label: "Dịch PDF", path: "/tool/translate" },
 ];
 

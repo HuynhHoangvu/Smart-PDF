@@ -26,6 +26,7 @@ const toolConfig: Record<string, { title: string; formats: string[] }> = {
   "pdf-to-image": { title: "PDF sang Hình ảnh", formats: ["PDF"] },
   "image-to-pdf": { title: "Hình ảnh sang PDF", formats: ["Ảnh"] },
   "convert-image": { title: "Chuyển đổi ảnh", formats: ["Ảnh"] },
+  "compress-image": { title: "Nén hình ảnh", formats: ["Ảnh"] },
   translate: { title: "Dịch PDF", formats: ["PDF", "DOCX"] },
   "word-to-pdf": { title: "Word sang PDF", formats: ["DOCX"] },
   read: { title: "Đọc PDF", formats: ["PDF"] },
@@ -41,6 +42,7 @@ const toolAccept: Record<string, string> = {
   "pdf-to-image": ".pdf,application/pdf",
   "image-to-pdf": "image/*",
   "convert-image": "image/*",
+  "compress-image": "image/*",
   translate: ".pdf,application/pdf",
   "word-to-pdf": ".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 };
@@ -145,6 +147,8 @@ export default function ToolPage() {
         />
       ) : toolId === "convert-image" ? (
         <ImageConvertWorkspace mode="convert" initialFiles={files} onCancel={() => setFiles([])} />
+      ) : toolId === "compress-image" ? (
+        <ImageConvertWorkspace mode="compress" initialFiles={files} onCancel={() => setFiles([])} />
       ) : (
         <div style={{ textAlign: "center", marginTop: "50px" }}>
           <h3>Đã chọn {files.length} file</h3>

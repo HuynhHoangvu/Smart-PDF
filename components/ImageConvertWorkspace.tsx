@@ -5,7 +5,7 @@ import { Upload, RefreshCw, Loader2, ArrowLeftRight, ImagePlus } from "lucide-re
 import MergeResult from "./MergeResult";
 
 type ImageConvertWorkspaceProps = {
-  mode?: "convert" | "to-pdf";
+  mode?: "convert" | "to-pdf" | "compress";
   initialFiles?: File[];
   onCancel?: () => void;
 };
@@ -22,6 +22,8 @@ function isImageFile(f: File) {
 export default function ImageConvertWorkspace({ mode = "convert", initialFiles, onCancel }: ImageConvertWorkspaceProps) {
   const [files, setFiles] = useState<File[]>(() => (initialFiles || []).filter(isImageFile));
   const [toFmt, setToFmt] = useState(mode === "to-pdf" ? "pdf" : "png");
+  const [level, setLevel] = useState<"medium" | "extreme" | "ultra">("medium");
+  const [compressFmt, setCompressFmt] = useState<"auto" | "jpg" | "png" | "webp">("auto");
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
@@ -33,7 +35,7 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
   // mis-tag less common formats (webp, heic, bmp) and would otherwise
   // filter them out of the picker even though sharp can read them fine.
   const accept = "image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.avif,.heic,.heif";
-  const multi = mode === "to-pdf";
+  const multi = mode === "to-pdf" || mode === "compress";
 
   const handleFiles = (fList: FileList | File[]) => {
     setFiles(Array.from(fList).filter(isImageFile));
@@ -63,6 +65,21 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
           setError(`Đã bỏ qua ${decodeURIComponent(skipped)} vì file lỗi hoặc không đúng định dạng ảnh. Các ảnh còn lại đã được gộp thành công.`);
         }
         setPdfResult(blob);
+      } else if (mode === "compress") {
+        for (const f of files) {
+          const form = new FormData();
+          form.append("file", f);
+          form.append("level", level);
+          form.append("format", compressFmt);
+          const res = await fetch(`/api/compress-image`, { method: "POST", body: form });
+          if (!res.ok) throw new Error((await res.json()).detail || "Lỗi");
+          const blob = await res.blob();
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          const ext = blob.type === "image/jpeg" ? "jpg" : blob.type === "image/webp" ? "webp" : "png";
+          a.download = f.name.replace(/\.\w+$/, "") + "_compressed." + ext;
+          a.click();
+        }
       } else {
         for (const f of files) {
           const form = new FormData();
@@ -83,7 +100,7 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
       setStatus("error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [files, mode, toFmt]);
+  }, [files, mode, toFmt, level, compressFmt]);
 
   // Auto-combine as soon as images land (drag-drop or initialFiles) — no
   // extra click needed for the to-pdf flow.
@@ -95,7 +112,7 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
     if (files.length === 0) autoConvertedRef.current = false;
   }, [mode, files, status, convert]);
 
-  const title = mode === "to-pdf" ? "Hình ảnh → PDF" : "Chuyển đổi định dạng ảnh";
+  const title = mode === "to-pdf" ? "Hình ảnh → PDF" : mode === "compress" ? "Nén hình ảnh" : "Chuyển đổi định dạng ảnh";
 
   if (pdfResult) {
     return (
@@ -133,7 +150,13 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
           <button className="dropzone-btn">
             <Upload size={14} style={{ marginRight: 6 }} /> Chọn ảnh
           </button>
-          <div className="dropzone-hint">{mode === "to-pdf" ? "hoặc kéo thả nhiều ảnh vào đây — tự động gộp thành PDF" : "hoặc kéo thả ảnh vào đây"}</div>
+          <div className="dropzone-hint">
+            {mode === "to-pdf"
+              ? "hoặc kéo thả nhiều ảnh vào đây — tự động gộp thành PDF"
+              : mode === "compress"
+                ? "hoặc kéo thả nhiều ảnh vào đây"
+                : "hoặc kéo thả ảnh vào đây"}
+          </div>
         </div>
       </div>
     );
@@ -164,6 +187,28 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
         </div>
       )}
 
+      {mode === "compress" && (
+        <div style={{ marginBottom: 20, display: "flex", gap: 20, flexWrap: "wrap" }}>
+          <label style={{ fontSize: 13 }}>
+            Mức độ nén:&nbsp;
+            <select value={level} onChange={(e) => setLevel(e.target.value as typeof level)} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #e2e8f0" }}>
+              <option value="medium">Vừa phải (giữ chất lượng)</option>
+              <option value="extreme">Mạnh</option>
+              <option value="ultra">Tối đa (giảm dung lượng nhiều nhất)</option>
+            </select>
+          </label>
+          <label style={{ fontSize: 13 }}>
+            Định dạng tải về:&nbsp;
+            <select value={compressFmt} onChange={(e) => setCompressFmt(e.target.value as typeof compressFmt)} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #e2e8f0" }}>
+              <option value="auto">Giữ nguyên định dạng gốc</option>
+              <option value="jpg">JPG</option>
+              <option value="png">PNG</option>
+              <option value="webp">WEBP</option>
+            </select>
+          </label>
+        </div>
+      )}
+
       {files.length > 0 && (
         <div style={{ marginBottom: 16, display: "flex", flexWrap: "wrap", gap: 8 }}>
           {files.map((f) => (
@@ -179,6 +224,10 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
           {status === "loading" ? (
             <>
               <Loader2 size={14} className="spin" /> Đang xử lý...
+            </>
+          ) : mode === "compress" ? (
+            <>
+              <ArrowLeftRight size={14} /> Nén & Tải về
             </>
           ) : (
             <>
