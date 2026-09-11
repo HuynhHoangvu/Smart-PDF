@@ -404,7 +404,15 @@ export default function MergeWorkspace({ initialFiles, onCancel }: MergeWorkspac
       </div>
       <div className="toolbar-right" style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {mergeError && <span style={{ color: "#e53e3e", fontSize: 13 }}>{mergeError}</span>}
-        <button className="btn btn-outline" onClick={onCancel} style={{ fontSize: 14 }}>
+        <button
+          className="btn btn-outline"
+          onClick={() => {
+            setFiles([]);
+            setPages([]);
+            onCancel?.();
+          }}
+          style={{ fontSize: 14 }}
+        >
           Hủy
         </button>
         <button

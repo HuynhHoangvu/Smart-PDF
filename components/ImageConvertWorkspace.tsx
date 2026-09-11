@@ -336,7 +336,17 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
             </>
           )}
         </button>
-        <button className="btn btn-outline" onClick={onCancel}>
+        <button
+          className="btn btn-outline"
+          onClick={() => {
+            setFiles([]);
+            setPdfResult(null);
+            setStatus("idle");
+            setError("");
+            setEstimates({});
+            onCancel?.();
+          }}
+        >
           <RefreshCw size={14} style={{ marginRight: 6 }} /> Chọn lại
         </button>
       </div>

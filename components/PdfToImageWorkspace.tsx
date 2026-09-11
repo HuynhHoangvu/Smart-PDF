@@ -110,7 +110,16 @@ export default function PdfToImageWorkspace({ initialFiles, onCancel }: PdfToIma
             <Download size={14} style={{ marginRight: 6 }} /> Tải tất cả ({images.length} ảnh)
           </button>
         )}
-        <button className="btn btn-outline" onClick={onCancel}>
+        <button
+          className="btn btn-outline"
+          onClick={() => {
+            setFile(null);
+            setImages([]);
+            setStatus("idle");
+            setError("");
+            onCancel?.();
+          }}
+        >
           <RefreshCw size={14} style={{ marginRight: 6 }} /> Chọn file khác
         </button>
       </div>
