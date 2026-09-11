@@ -128,12 +128,19 @@ export default function SignWorkspace() {
   const placeSignature = (dataUrl: string) => {
     setSignature(dataUrl);
     setCreating(false);
-    const dims = currentDims;
+    placeOnPage(currentPage);
+  };
+
+  // Centers a default-sized box near the bottom of the given page — used
+  // both for the initial placement and for "move to this page" once a
+  // signature already exists but the user has navigated elsewhere.
+  const placeOnPage = (targetPage: number) => {
+    const dims = pageDimsRef.current.get(targetPage);
     const boxWidth = DEFAULT_SIG_WIDTH;
     const boxHeight = DEFAULT_SIG_HEIGHT;
     const centerX = dims ? Math.max(0, (dims.renderedWidth - boxWidth) / 2) : 40;
     const centerY = dims ? Math.max(0, dims.renderedHeight - boxHeight - 40) : 40;
-    setSigRect({ page: currentPage, x: centerX, y: centerY, width: boxWidth, height: boxHeight });
+    setSigRect({ page: targetPage, x: centerX, y: centerY, width: boxWidth, height: boxHeight });
   };
 
   const useDrawnSignature = () => {
@@ -341,9 +348,28 @@ export default function SignWorkspace() {
         </div>
       )}
 
-      {signature && (
-        <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "#4a5568" }}>
+      {signature && sigRect && sigRect.page === currentPage && (
+        <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "#4a5568", flexWrap: "wrap" }}>
           <Move size={14} /> Kéo để di chuyển, kéo góc dưới phải để đổi kích thước.
+          <button
+            className="btn btn-outline"
+            style={{ padding: "4px 10px", fontSize: 12 }}
+            onClick={() => {
+              setSignature(null);
+              setSigRect(null);
+            }}
+          >
+            <Trash2 size={12} style={{ marginRight: 4 }} /> Xóa chữ ký
+          </button>
+        </div>
+      )}
+
+      {signature && sigRect && sigRect.page !== currentPage && (
+        <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "#4a5568", flexWrap: "wrap" }}>
+          Chữ ký hiện đang ở trang {sigRect.page}.
+          <button className="btn btn-primary" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => placeOnPage(currentPage)}>
+            <PenLine size={12} style={{ marginRight: 4 }} /> Đặt vào trang này
+          </button>
           <button
             className="btn btn-outline"
             style={{ padding: "4px 10px", fontSize: 12 }}
