@@ -7,6 +7,7 @@ import {
   FileText,
   Image as ImageIcon,
   Languages,
+  PenLine,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -17,6 +18,7 @@ const tools = [
   { id: "pdf-to-word", title: "PDF sang Word", icon: <FileText size={20} />, color: "#3b82f6" },
   { id: "pdf-to-image", title: "PDF sang Hình ảnh", icon: <ImageIcon size={20} />, color: "#f59e0b" },
   { id: "compress-image", title: "Nén hình ảnh", icon: <ImageIcon size={20} />, color: "#ef4444" },
+  { id: "sign", title: "Ký tên", icon: <PenLine size={20} />, color: "#8b5cf6" },
   { id: "translate", title: "Dịch", icon: <Languages size={20} />, color: "#3b82f6" },
 ];
 

@@ -16,6 +16,7 @@ const MergeWorkspace = dynamic(() => import("@/components/MergeWorkspace"), { ss
 const SplitWorkspace = dynamic(() => import("@/components/SplitWorkspace"), { ssr: false });
 const TranslateWorkspace = dynamic(() => import("@/components/TranslateWorkspace"), { ssr: false });
 const ImageConvertWorkspace = dynamic(() => import("@/components/ImageConvertWorkspace"), { ssr: false });
+const SignWorkspace = dynamic(() => import("@/components/SignWorkspace"), { ssr: false });
 
 // Tools whose workspace renders a full-bleed grid editor (toolbar + card
 // grid) rather than a centered card — they get the wider background wrapper.
@@ -57,6 +58,9 @@ export default function ToolPage() {
       break;
     case "pdf-to-word":
       workspace = <PdfToWordWorkspace />;
+      break;
+    case "sign":
+      workspace = <SignWorkspace />;
       break;
     default:
       workspace = (

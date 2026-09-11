@@ -13,6 +13,7 @@ import {
   FileOutput,
   Grid2x2,
   ArrowLeftRight,
+  PenLine,
   Menu,
   X,
   ChevronRight,
@@ -63,6 +64,7 @@ const menuItems: MenuEntry[] = [
       },
     ],
   },
+  { id: "sign", icon: <PenLine size={20} />, label: "Ký tên", path: "/tool/sign" },
   { id: "translate", icon: <Languages size={20} />, label: "Dịch PDF", path: "/tool/translate" },
 ];
 
