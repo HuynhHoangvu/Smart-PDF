@@ -80,13 +80,30 @@ a {
 }
 
 .sidebar-logo {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   color: white;
   font-weight: bold;
   font-size: 22px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 4px;
+}
+
+.sidebar-logo-img {
+  width: 56px;
+  height: auto;
+  filter: drop-shadow(2px 3px 4px rgba(0, 0, 0, 0.35));
+}
+
+.sidebar-logo-text {
+  color: var(--accent-pink-soft);
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.25;
+  text-align: center;
+  max-width: 84px;
 }
 
 .sidebar-menu {
@@ -1532,9 +1549,20 @@ a {
     transform: translateX(0);
   }
   .sidebar-logo {
+    flex-direction: row;
     padding: 0 16px;
-    justify-content: space-between;
+    justify-content: flex-start;
+    gap: 10px;
     width: 100%;
+  }
+  .sidebar-logo-img {
+    width: 36px;
+  }
+  .sidebar-logo-text {
+    max-width: none;
+    text-align: left;
+    font-size: 15px;
+    flex: 1;
   }
   .sidebar-close-btn {
     display: flex;

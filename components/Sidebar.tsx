@@ -117,7 +117,9 @@ export default function Sidebar() {
 
       <div className={`sidebar ${mobileOpen ? "sidebar-open" : ""}`} ref={sidebarRef}>
         <div className="sidebar-logo">
-          <span style={{ color: "var(--accent-pink)" }}>THỤC THỤC</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="Bé Gián Thục" className="sidebar-logo-img" />
+          <span className="sidebar-logo-text">Bé Gián Thục</span>
           <button
             type="button"
             className="sidebar-close-btn"
