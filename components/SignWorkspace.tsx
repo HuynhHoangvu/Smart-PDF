@@ -5,6 +5,7 @@ import { Document, Page, pdfjs } from "react-pdf";
 import { PenLine, Upload, Trash2, Loader2, ChevronLeft, ChevronRight, Move, RefreshCw, Download } from "lucide-react";
 import FileDropzone from "./FileDropzone";
 import MergeResult from "./MergeResult";
+import { isImageFile, imageFileToPdfFile } from "@/lib/clientImageToPdf";
 
 pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
@@ -53,6 +54,13 @@ export default function SignWorkspace() {
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [error, setError] = useState("");
   const [result, setResult] = useState<Blob | null>(null);
+
+  // Only PDF bytes can be signed directly — Word docs and images are
+  // converted to a PDF first (client-side for images, via the existing
+  // word-to-pdf route for Word) so users can sign those the same way
+  // Smallpdf's sign tool does, instead of having to convert separately first.
+  const [preparing, setPreparing] = useState(false);
+  const [prepareError, setPrepareError] = useState("");
 
   const drawCanvasRef = useRef<HTMLCanvasElement>(null);
   const drawingRef = useRef(false);
@@ -214,6 +222,51 @@ export default function SignWorkspace() {
     }
   }, [file, signature, sigRect]);
 
+  const handleFileSelected = async (files: File[]) => {
+    const f = files[0];
+    if (!f) return;
+    setPrepareError("");
+
+    if (/\.pdf$/i.test(f.name)) {
+      setFile(f);
+      return;
+    }
+
+    if (isImageFile(f)) {
+      setPreparing(true);
+      try {
+        setFile(await imageFileToPdfFile(f));
+      } catch (e) {
+        setPrepareError((e as Error).message);
+      } finally {
+        setPreparing(false);
+      }
+      return;
+    }
+
+    if (/\.(docx?|doc)$/i.test(f.name)) {
+      setPreparing(true);
+      try {
+        const form = new FormData();
+        form.append("file", f);
+        const res = await fetch("/api/word-to-pdf", { method: "POST", body: form });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || "Chuyển đổi Word sang PDF thất bại.");
+        }
+        const blob = await res.blob();
+        setFile(new File([blob], f.name.replace(/\.(docx?|doc)$/i, "") + ".pdf", { type: "application/pdf" }));
+      } catch (e) {
+        setPrepareError((e as Error).message);
+      } finally {
+        setPreparing(false);
+      }
+      return;
+    }
+
+    setPrepareError(`File "${f.name}" không được hỗ trợ. Chỉ hỗ trợ PDF, Word (.doc/.docx), và ảnh (PNG/JPG).`);
+  };
+
   if (result) {
     return (
       <MergeResult
@@ -233,16 +286,26 @@ export default function SignWorkspace() {
     );
   }
 
+  if (preparing) {
+    return (
+      <div style={{ maxWidth: 500, margin: "80px auto", padding: 36, background: "#fff", borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", textAlign: "center" }}>
+        <Loader2 size={44} style={{ color: "#0062ff", margin: "0 auto 20px", display: "block", animation: "spin 1.5s linear infinite" }} />
+        <h3 style={{ fontSize: 18, fontWeight: 600, color: "#2d3748" }}>Đang chuyển sang PDF để ký...</h3>
+      </div>
+    );
+  }
+
   if (!file) {
     return (
       <div style={{ width: "100%", maxWidth: 800, margin: "40px auto", padding: 24 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>Ký tên PDF</h2>
         <FileDropzone
-          accept=".pdf,application/pdf"
-          formats={["PDF"]}
-          hint="hoặc kéo thả file PDF vào đây"
-          onFiles={(files) => files[0] && setFile(files[0])}
+          accept=".pdf,application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*"
+          formats={["PDF", "DOCX", "PNG", "JPG"]}
+          hint="hoặc kéo thả file PDF, Word, hoặc ảnh vào đây — file khác PDF sẽ tự động chuyển sang PDF trước"
+          onFiles={handleFileSelected}
         />
+        {prepareError && <p style={{ color: "#e53e3e", marginTop: 12, fontSize: 13 }}>{prepareError}</p>}
       </div>
     );
   }
