@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     const mime = outFormat === "jpeg" ? "image/jpeg" : outFormat === "webp" ? "image/webp" : "image/png";
     const baseName = file.name.replace(/\.[^/.]+$/, "");
 
-    return new NextResponse(outBuffer, {
+    return new NextResponse(new Uint8Array(outBuffer), {
       status: 200,
       headers: {
         "Content-Type": mime,
