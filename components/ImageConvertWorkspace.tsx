@@ -11,6 +11,19 @@ type ImageConvertWorkspaceProps = {
 };
 
 const IMAGE_EXTENSIONS = /\.(jpe?g|png|webp|gif|bmp|tiff?|avif|heic|heif)$/i;
+const COMPRESS_LEVELS = ["medium", "extreme", "ultra"] as const;
+type CompressLevel = (typeof COMPRESS_LEVELS)[number];
+const LEVEL_LABEL: Record<CompressLevel, string> = { medium: "Vừa phải", extreme: "Mạnh", ultra: "Tối đa" };
+
+type Estimate = { status: "loading" | "done" | "error"; blob?: Blob; size?: number };
+
+function formatBytes(bytes: number) {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB"];
+  const i = Math.min(sizes.length - 1, Math.floor(Math.log(bytes) / Math.log(k)));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+}
 
 // Some browsers/OSes don't tag less common formats with a MIME type at all
 // (e.g. dragging a .heic file on Windows can report type === ""), so fall
@@ -30,6 +43,8 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
   const [pdfResult, setPdfResult] = useState<Blob | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const autoConvertedRef = useRef(false);
+  const [estimates, setEstimates] = useState<Partial<Record<CompressLevel, Estimate>>>({});
+  const estimateRunId = useRef(0);
 
   // Explicit extensions alongside the MIME wildcard — some browsers/OSes
   // mis-tag less common formats (webp, heic, bmp) and would otherwise
@@ -66,14 +81,22 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
         }
         setPdfResult(blob);
       } else if (mode === "compress") {
-        for (const f of files) {
-          const form = new FormData();
-          form.append("file", f);
-          form.append("level", level);
-          form.append("format", compressFmt);
-          const res = await fetch(`/api/compress-image`, { method: "POST", body: form });
-          if (!res.ok) throw new Error((await res.json()).detail || "Lỗi");
-          const blob = await res.blob();
+        for (const [i, f] of files.entries()) {
+          // The first file was already compressed at this exact level+format
+          // while the user was picking one (see the estimate effect above).
+          const cached = i === 0 ? estimates[level] : undefined;
+          let blob: Blob;
+          if (cached?.status === "done" && cached.blob) {
+            blob = cached.blob;
+          } else {
+            const form = new FormData();
+            form.append("file", f);
+            form.append("level", level);
+            form.append("format", compressFmt);
+            const res = await fetch(`/api/compress-image`, { method: "POST", body: form });
+            if (!res.ok) throw new Error((await res.json()).detail || "Lỗi");
+            blob = await res.blob();
+          }
           const a = document.createElement("a");
           a.href = URL.createObjectURL(blob);
           const ext = blob.type === "image/jpeg" ? "jpg" : blob.type === "image/webp" ? "webp" : "png";
@@ -100,7 +123,44 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
       setStatus("error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [files, mode, toFmt, level, compressFmt]);
+  }, [files, mode, toFmt, level, compressFmt, estimates]);
+
+  // As soon as an image is picked (compress mode only), actually compress it
+  // at all three levels in the background — real sizes beat vague labels,
+  // and the result is cached so hitting "Nén & Tải về" for whichever level
+  // the user settles on is instant for that first file instead of
+  // re-running the same work. Based on the first file only (representative
+  // even when several were selected — a full per-file matrix would be a lot
+  // of extra requests for something that's just meant as a preview).
+  useEffect(() => {
+    if (mode !== "compress" || !files.length) return;
+    const file = files[0];
+    const runId = ++estimateRunId.current;
+    setEstimates({});
+    COMPRESS_LEVELS.forEach((lvl) => {
+      setEstimates((prev) => ({ ...prev, [lvl]: { status: "loading" } }));
+      (async () => {
+        try {
+          const form = new FormData();
+          form.append("file", file);
+          form.append("level", lvl);
+          form.append("format", compressFmt);
+          const res = await fetch(`/api/compress-image`, { method: "POST", body: form });
+          if (runId !== estimateRunId.current) return;
+          if (!res.ok) {
+            setEstimates((prev) => ({ ...prev, [lvl]: { status: "error" } }));
+            return;
+          }
+          const blob = await res.blob();
+          if (runId !== estimateRunId.current) return;
+          setEstimates((prev) => ({ ...prev, [lvl]: { status: "done", blob, size: blob.size } }));
+        } catch {
+          if (runId === estimateRunId.current) setEstimates((prev) => ({ ...prev, [lvl]: { status: "error" } }));
+        }
+      })();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, files, compressFmt]);
 
   // Auto-combine as soon as images land (drag-drop or initialFiles) — no
   // extra click needed for the to-pdf flow.
@@ -206,6 +266,47 @@ export default function ImageConvertWorkspace({ mode = "convert", initialFiles, 
               <option value="webp">WEBP</option>
             </select>
           </label>
+        </div>
+      )}
+
+      {mode === "compress" && files.length > 0 && (
+        <div style={{ marginBottom: 20, display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {COMPRESS_LEVELS.map((lvl) => {
+            const e = estimates[lvl];
+            const active = level === lvl;
+            return (
+              <button
+                key={lvl}
+                type="button"
+                onClick={() => setLevel(lvl)}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: `1.5px solid ${active ? "#0062ff" : "#e2e8f0"}`,
+                  background: active ? "#ebf3ff" : "#fff",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  minWidth: 120,
+                }}
+              >
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#2d3748" }}>{LEVEL_LABEL[lvl]}</div>
+                {!e || e.status === "loading" ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#a0aec0" }}>
+                    <Loader2 size={10} className="spin" /> Đang tính...
+                  </div>
+                ) : e.status === "error" || !e.size ? (
+                  <div style={{ fontSize: 11, color: "#a0aec0" }}>Không tính được</div>
+                ) : (
+                  <div style={{ fontSize: 11 }}>
+                    <span style={{ color: "#2d3748", fontWeight: 600 }}>{formatBytes(e.size)}</span>{" "}
+                    <span style={{ color: files[0].size > e.size ? "#38a169" : "#a0aec0" }}>
+                      ({files[0].size > e.size ? `-${Math.round(((files[0].size - e.size) / files[0].size) * 100)}%` : "không giảm"})
+                    </span>
+                  </div>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
 

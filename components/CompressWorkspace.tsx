@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FileDown, RefreshCw, Loader2, Minimize2, Settings, Zap } from "lucide-react";
 import FileDropzone from "./FileDropzone";
 
@@ -10,6 +10,7 @@ type CompressWorkspaceProps = {
 };
 
 type Level = "medium" | "extreme" | "ultra";
+const LEVELS: Level[] = ["medium", "extreme", "ultra"];
 
 type Result = {
   blob: Blob;
@@ -19,6 +20,8 @@ type Result = {
   filename: string;
 };
 
+type Estimate = { status: "loading" | "done" | "error"; blob?: Blob; size?: number };
+
 export default function CompressWorkspace({ initialFiles, onCancel }: CompressWorkspaceProps) {
   const [file, setFile] = useState<File | null>(initialFiles?.[0] || null);
   const [level, setLevel] = useState<Level>("medium");
@@ -26,6 +29,40 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<Result | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const [estimates, setEstimates] = useState<Partial<Record<Level, Estimate>>>({});
+  const estimateRunId = useRef(0);
+
+  // As soon as a valid PDF is picked, actually compress it at all three
+  // levels in the background — real sizes beat vague labels, and the result
+  // is cached so pressing "Bắt đầu nén" for whichever level the user settles
+  // on is instant instead of re-running the same work.
+  useEffect(() => {
+    if (!file || !file.name.toLowerCase().endsWith(".pdf")) return;
+    const runId = ++estimateRunId.current;
+    setEstimates({});
+    LEVELS.forEach((lvl) => {
+      setEstimates((prev) => ({ ...prev, [lvl]: { status: "loading" } }));
+      (async () => {
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("level", lvl);
+          const res = await fetch(`/api/compress`, { method: "POST", body: formData });
+          if (runId !== estimateRunId.current) return;
+          if (!res.ok) {
+            setEstimates((prev) => ({ ...prev, [lvl]: { status: "error" } }));
+            return;
+          }
+          const blob = await res.blob();
+          if (runId !== estimateRunId.current) return;
+          setEstimates((prev) => ({ ...prev, [lvl]: { status: "done", blob, size: blob.size } }));
+        } catch {
+          if (runId === estimateRunId.current) setEstimates((prev) => ({ ...prev, [lvl]: { status: "error" } }));
+        }
+      })();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file]);
 
   if (!file) {
     return (
@@ -89,23 +126,26 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
     }, 150);
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("level", level);
-
-      const res = await fetch(`/api/compress`, {
-        method: "POST",
-        body: formData,
-      });
-
-      clearInterval(interval);
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.detail || "Nén file thất bại. Vui lòng thử lại.");
+      // Already computed in the background while the user was choosing a
+      // level (see the estimate effect above) — reuse it instead of paying
+      // for the same compression twice.
+      const cached = estimates[level];
+      let blob: Blob;
+      if (cached?.status === "done" && cached.blob) {
+        blob = cached.blob;
+      } else {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("level", level);
+        const res = await fetch(`/api/compress`, { method: "POST", body: formData });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.detail || "Nén file thất bại. Vui lòng thử lại.");
+        }
+        blob = await res.blob();
       }
 
-      const blob = await res.blob();
+      clearInterval(interval);
       setProgress(100);
 
       setTimeout(() => {
@@ -206,6 +246,27 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
     );
   }
 
+  const estimateBadge = (lvl: Level) => {
+    const e = estimates[lvl];
+    if (!e || e.status === "loading") {
+      return (
+        <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#a0aec0", whiteSpace: "nowrap" }}>
+          <Loader2 size={12} className="spin" /> Đang tính...
+        </span>
+      );
+    }
+    if (e.status === "error" || !e.size) {
+      return <span style={{ fontSize: 12, color: "#a0aec0", whiteSpace: "nowrap" }}>Không tính được</span>;
+    }
+    const savingsPct = Math.round(((file.size - e.size) / file.size) * 100);
+    return (
+      <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", whiteSpace: "nowrap" }}>
+        <strong style={{ fontSize: 14, color: "#2d3748" }}>{formatSize(e.size)}</strong>
+        <span style={{ fontSize: 11, color: savingsPct > 0 ? "#38a169" : "#a0aec0" }}>{savingsPct > 0 ? `-${savingsPct}%` : "không giảm"}</span>
+      </span>
+    );
+  };
+
   return (
     <div style={{ maxWidth: 550, margin: "60px auto", padding: 30, background: "#fff", borderRadius: 12, boxShadow: "0 4px 25px rgba(0,0,0,0.06)" }}>
       <h3 style={{ fontSize: 19, fontWeight: 700, color: "#2d3748", textAlign: "center", marginBottom: 6 }}>Nén dung lượng PDF</h3>
@@ -236,6 +297,7 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
             <strong style={{ display: "block", fontSize: 15, color: "#2d3748" }}>Nén vừa (Khuyên dùng)</strong>
             <span style={{ fontSize: 12, color: "#718096" }}>Giảm kích thước đáng kể nhưng vẫn đảm bảo chữ viết cực kỳ sắc nét.</span>
           </div>
+          {estimateBadge("medium")}
         </label>
 
         <label
@@ -260,6 +322,7 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
             <strong style={{ display: "block", fontSize: 15, color: "#2d3748" }}>Nén cực mạnh</strong>
             <span style={{ fontSize: 12, color: "#718096" }}>Giảm dung lượng xuống mức tối đa (thích hợp để up lên các trang web nộp hồ sơ giới hạn dung lượng thấp).</span>
           </div>
+          {estimateBadge("extreme")}
         </label>
 
         <label
@@ -284,6 +347,7 @@ export default function CompressWorkspace({ initialFiles, onCancel }: CompressWo
             <strong style={{ display: "block", fontSize: 15, color: "#2d3748" }}>Nén siêu tối ưu (Target ~2MB)</strong>
             <span style={{ fontSize: 12, color: "#718096" }}>Giảm dung lượng tối đa, phù hợp khi cần file dưới 3MB để upload lên website.</span>
           </div>
+          {estimateBadge("ultra")}
         </label>
       </div>
 
