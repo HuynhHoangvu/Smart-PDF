@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PDFDocument } from "pdf-lib";
-import { translatePdfPageToHtml } from "@/lib/gemini";
+import { translatePageToHtml } from "@/lib/gemini";
+import { loadPdfDocument, renderPageToJpeg } from "@/lib/pdfRaster";
 import { sanitizeTranslatedHtml } from "@/lib/sanitizeHtml";
 import { requireFile, assertMagicBytes, assertFileSize, handleApiError, ApiError, SIZE_LIMITS } from "@/lib/apiValidation";
 
@@ -8,6 +8,9 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 const MAX_TRANSLATE_PAGES = 60;
+// 2.5x scale (~180dpi) — sharp enough for Gemini to read dense legal-document
+// text/stamps reliably, without the huge payloads full print-DPI would mean.
+const RENDER_ZOOM = 2.5;
 
 type TranslatedPage = {
   page_num: number;
@@ -16,14 +19,6 @@ type TranslatedPage = {
   is_group_lead: boolean;
   group_pages: number[];
 };
-
-async function extractPageAsBase64(src: PDFDocument, pageIndex: number): Promise<string> {
-  const out = await PDFDocument.create();
-  const [copied] = await out.copyPages(src, [pageIndex]);
-  out.addPage(copied);
-  const bytes = await out.save();
-  return Buffer.from(bytes).toString("base64");
-}
 
 // Runs `fn` over `items` with at most `limit` in flight at once.
 async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
@@ -48,13 +43,13 @@ export async function POST(req: NextRequest) {
     const fileBuffer = await assertMagicBytes(file, "pdf");
 
     const bytes = new Uint8Array(fileBuffer);
-    let src;
+    let pdfDoc;
     try {
-      src = await PDFDocument.load(bytes);
+      pdfDoc = await loadPdfDocument(bytes);
     } catch {
       throw new ApiError(`File "${file.name}" không phải PDF hợp lệ hoặc đã bị hỏng.`, 400);
     }
-    const numPages = src.getPageCount();
+    const numPages = pdfDoc.numPages;
     if (numPages > MAX_TRANSLATE_PAGES) {
       throw new ApiError(`PDF có ${numPages} trang, vượt quá giới hạn ${MAX_TRANSLATE_PAGES} trang cho mỗi lần dịch.`, 400);
     }
@@ -62,10 +57,10 @@ export async function POST(req: NextRequest) {
 
     const translatedPages = await mapWithConcurrency(pageIndices, 4, async (pageIndex): Promise<TranslatedPage> => {
       const pageNum = pageIndex + 1;
-      const b64 = await extractPageAsBase64(src, pageIndex);
       let html = "";
       try {
-        html = await translatePdfPageToHtml(b64);
+        const { buffer } = await renderPageToJpeg(pdfDoc, pageNum, RENDER_ZOOM, 0.92);
+        html = await translatePageToHtml(buffer.toString("base64"), "image/jpeg");
       } catch (err) {
         console.error(`Translate page ${pageNum} failed:`, err);
       }

@@ -38,7 +38,7 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function callGemini(model: string, apiKey: string, pdfBase64: string, retries = 3): Promise<string> {
+async function callGemini(model: string, apiKey: string, dataBase64: string, mimeType: string, retries = 3): Promise<string> {
   const client = new GoogleGenAI({ apiKey });
   let lastErr: unknown;
   for (let attempt = 0; attempt < retries; attempt++) {
@@ -48,7 +48,7 @@ async function callGemini(model: string, apiKey: string, pdfBase64: string, retr
         contents: [
           {
             role: "user",
-            parts: [{ inlineData: { data: pdfBase64, mimeType: "application/pdf" } }, { text: VISION_PROMPT }],
+            parts: [{ inlineData: { data: dataBase64, mimeType } }, { text: VISION_PROMPT }],
           },
         ],
         config: { temperature: 0.05, maxOutputTokens: 16384 },
@@ -64,17 +64,23 @@ async function callGemini(model: string, apiKey: string, pdfBase64: string, retr
   throw lastErr;
 }
 
-export async function translatePdfPageToHtml(pdfBase64: string): Promise<string> {
+/**
+ * Translates one page, given as a rendered JPEG/PNG image rather than a
+ * PDF — Gemini's own PDF-parsing pipeline can silently downsample scanned
+ * pages (photographed legal documents especially) below a legible
+ * resolution, where a raster image we control the DPI for reads reliably.
+ */
+export async function translatePageToHtml(imageBase64: string, mimeType = "image/jpeg"): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY chưa được cấu hình");
 
   for (const model of GEMINI_MODELS) {
     try {
-      const raw = await callGemini(model, apiKey, pdfBase64);
+      const raw = await callGemini(model, apiKey, imageBase64, mimeType);
       const cleaned = raw.replace(/^```[a-z]*\s*/i, "").replace(/\s*```$/i, "").trim();
       if (cleaned && cleaned.length > 30) return cleaned;
     } catch (err) {
-      console.warn(`PDF translate model ${model} failed:`, err);
+      console.warn(`Page translate model ${model} failed:`, err);
     }
   }
   return "";
