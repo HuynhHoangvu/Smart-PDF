@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 import type { Element, AnyNode } from "domhandler";
-import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, AlignmentType, WidthType, BorderStyle } from "docx";
+import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, AlignmentType, WidthType, BorderStyle, ShadingType } from "docx";
 
 function parseInlineStyle(style: string | undefined): Record<string, string> {
   const out: Record<string, string> = {};
@@ -12,37 +12,76 @@ function parseInlineStyle(style: string | undefined): Record<string, string> {
   return out;
 }
 
+/** "#ff0000" / "#f00" / "red" / "rgb(255,0,0)" → "FF0000" (docx requires exactly 6 bare hex digits, no #, no named colors, no shorthand — anything that doesn't resolve to that is dropped rather than passed through and crashing the docx builder). */
+const NAMED_COLORS: Record<string, string> = {
+  red: "FF0000", blue: "0070C0", darkblue: "1F4E79", navy: "1F4E79", green: "006400",
+  white: "FFFFFF", black: "000000", gray: "808080", grey: "808080", orange: "FFA500", yellow: "FFFF00",
+};
+function toDocxColor(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const v = raw.trim().toLowerCase();
+  let hex: string | undefined;
+  if (v.startsWith("#")) {
+    const body = v.slice(1);
+    if (body.length === 3) hex = body.split("").map((c) => c + c).join("");
+    else if (body.length === 6) hex = body;
+  } else if (NAMED_COLORS[v]) {
+    hex = NAMED_COLORS[v];
+  } else {
+    const rgb = v.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+    if (rgb) hex = rgb.slice(1, 4).map((n) => Math.min(255, Number(n)).toString(16).padStart(2, "0")).join("");
+  }
+  return hex && /^[0-9a-f]{6}$/.test(hex) ? hex.toUpperCase() : undefined;
+}
+
+/** "10pt" / "14px" → half-points for docx's `size` (docx TextRun size is in half-points: 10pt = 20). */
+function toDocxHalfPoints(raw: string | undefined): number | undefined {
+  if (!raw) return undefined;
+  const m = raw.match(/^([\d.]+)(pt|px)?$/);
+  if (!m) return undefined;
+  const n = Number(m[1]);
+  const pt = m[2] === "px" ? n * 0.75 : n;
+  return Math.round(pt * 2);
+}
+
 const MAX_WALK_DEPTH = 50;
 
-function textRunsFromNode($: ReturnType<typeof cheerio.load>, el: Element, baseBold = false): TextRun[] {
+type RunStyle = { bold: boolean; italic: boolean; color?: string; size?: number };
+
+function textRunsFromNode($: ReturnType<typeof cheerio.load>, el: Element, base: Partial<RunStyle> = {}): TextRun[] {
   const runs: TextRun[] = [];
   const node = $(el);
 
-  const walk = (n: AnyNode, bold: boolean, italic: boolean, depth: number) => {
+  const walk = (n: AnyNode, ctx: RunStyle, depth: number) => {
     if (depth > MAX_WALK_DEPTH) return;
     if (n.type === "text") {
       const text = $(n).text();
-      if (text) runs.push(new TextRun({ text, bold, italics: italic }));
+      if (text) runs.push(new TextRun({ text, bold: ctx.bold, italics: ctx.italic, color: ctx.color, size: ctx.size }));
       return;
     }
     if (n.type === "tag") {
       const el = n as Element;
       const tag = el.tagName?.toLowerCase();
       const style = parseInlineStyle($(el).attr("style"));
-      const isBold = bold || tag === "b" || tag === "strong" || style["font-weight"] === "bold" || Number(style["font-weight"]) >= 600;
-      const isItalic = italic || tag === "i" || tag === "em" || style["font-style"] === "italic";
+      const next: RunStyle = {
+        bold: ctx.bold || tag === "b" || tag === "strong" || style["font-weight"] === "bold" || Number(style["font-weight"]) >= 600,
+        italic: ctx.italic || tag === "i" || tag === "em" || style["font-style"] === "italic",
+        color: toDocxColor(style["color"]) ?? ctx.color,
+        size: toDocxHalfPoints(style["font-size"]) ?? ctx.size,
+      };
       if (tag === "br") {
         runs.push(new TextRun({ text: "", break: 1 }));
         return;
       }
-      el.children?.forEach((c) => walk(c as AnyNode, isBold, isItalic, depth + 1));
+      el.children?.forEach((c) => walk(c as AnyNode, next, depth + 1));
     }
   };
 
-  node.contents().each((_, c) => walk(c as AnyNode, baseBold, false, 0));
+  const baseCtx: RunStyle = { bold: base.bold ?? false, italic: base.italic ?? false, color: base.color, size: base.size };
+  node.contents().each((_, c) => walk(c as AnyNode, baseCtx, 0));
   if (runs.length === 0) {
     const text = node.text();
-    if (text.trim()) runs.push(new TextRun({ text, bold: baseBold }));
+    if (text.trim()) runs.push(new TextRun({ text, bold: baseCtx.bold, color: baseCtx.color, size: baseCtx.size }));
   }
   return runs;
 }
@@ -67,11 +106,15 @@ function buildTable($: ReturnType<typeof cheerio.load>, tableEl: Element): Table
         .each((_, td) => {
           const cellStyle = parseInlineStyle($(td).attr("style"));
           const borderless = cellStyle["border"] === "none" || style["border"] === "none";
-          const runs = textRunsFromNode($, td);
+          const isHeaderCell = td.tagName?.toLowerCase() === "th";
+          const cellColor = toDocxColor(cellStyle["color"]);
+          const runs = textRunsFromNode($, td, isHeaderCell ? { bold: true, color: cellColor } : { color: cellColor });
           const alignment = alignmentFromStyle(cellStyle);
+          const fill = toDocxColor(cellStyle["background-color"] ?? cellStyle["background"]);
           cells.push(
             new TableCell({
               children: [new Paragraph({ children: runs.length ? runs : [new TextRun("")], alignment })],
+              shading: fill ? { type: ShadingType.CLEAR, color: "auto", fill } : undefined,
               borders: borderless
                 ? {
                     top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
@@ -105,7 +148,7 @@ function htmlToDocxElements(html: string): (Paragraph | Table)[] {
       }
       const style = parseInlineStyle($(el).attr("style"));
       const bold = style["font-weight"] === "bold" || Number(style["font-weight"]) >= 600;
-      const runs = textRunsFromNode($, el, bold);
+      const runs = textRunsFromNode($, el, { bold, color: toDocxColor(style["color"]), size: toDocxHalfPoints(style["font-size"]) });
       if (runs.length === 0) return;
       elements.push(
         new Paragraph({
