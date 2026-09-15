@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { Upload, Download, Loader2, Languages, FileText, AlertCircle, RefreshCw, ZoomIn, ZoomOut, Tag } from "lucide-react";
+import { isImageFile, imageFileToPdfFile } from "@/lib/clientImageToPdf";
 
 pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
@@ -42,10 +43,12 @@ function Dropzone({ onFiles }: { onFiles: (f: File) => void }) {
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const isAcceptable = (f: File) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf") || isImageFile(f);
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
-    const files = Array.from(e.dataTransfer.files).filter((f) => f.type === "application/pdf");
+    const files = Array.from(e.dataTransfer.files).filter(isAcceptable);
     if (files.length) onFiles(files[0]);
   };
 
@@ -60,14 +63,14 @@ function Dropzone({ onFiles }: { onFiles: (f: File) => void }) {
       onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
     >
-      <input ref={inputRef} type="file" accept=".pdf" hidden onChange={(e) => e.target.files?.[0] && onFiles(e.target.files[0])} />
+      <input ref={inputRef} type="file" accept=".pdf,image/*" hidden onChange={(e) => e.target.files?.[0] && onFiles(e.target.files[0])} />
       <div className="translate-dropzone-icon">
         <Languages size={48} strokeWidth={1.5} />
       </div>
-      <h2 className="translate-dropzone-title">Dịch tài liệu PDF</h2>
-      <p className="translate-dropzone-sub">Hỗ trợ: Hợp đồng lao động · Học bạ · Giấy kết hôn · Giấy khai sinh · Giấy ủy quyền · Hộ chiếu/Visa</p>
+      <h2 className="translate-dropzone-title">Dịch tài liệu</h2>
+      <p className="translate-dropzone-sub">Hỗ trợ: Hợp đồng lao động · Học bạ · Giấy kết hôn · Giấy khai sinh · Giấy ủy quyền · Hộ chiếu/Visa — dạng PDF hoặc ảnh chụp/scan</p>
       <button className="btn btn-primary translate-upload-btn">
-        <Upload size={16} /> Chọn file PDF
+        <Upload size={16} /> Chọn file PDF hoặc ảnh
       </button>
       <p className="translate-dropzone-hint">hoặc kéo thả file vào đây · Không giới hạn kích thước</p>
     </div>
@@ -278,11 +281,23 @@ export default function TranslateWorkspace() {
     }
   };
 
-  const handleFile = useCallback((f: File) => {
-    setFile(f);
-    setObjectUrl(URL.createObjectURL(f));
+  const handleFile = useCallback(async (f: File) => {
+    let pdfFile = f;
+    if (isImageFile(f)) {
+      setStatus("loading");
+      setLoadingStep("Đang chuyển ảnh sang PDF...");
+      try {
+        pdfFile = await imageFileToPdfFile(f);
+      } catch (e) {
+        setErrorMsg((e as Error).message);
+        setStatus("error");
+        return;
+      }
+    }
+    setFile(pdfFile);
+    setObjectUrl(URL.createObjectURL(pdfFile));
     setResult(null);
-    fetchTranslation(f);
+    fetchTranslation(pdfFile);
   }, []);
 
   const handleReset = () => {
