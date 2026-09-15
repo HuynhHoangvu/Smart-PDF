@@ -1,6 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 
-const GEMINI_MODELS = ["gemini-2.0-flash", "gemini-1.5-flash"];
+// gemini-2.0-flash and gemini-1.5-flash were retired by Google — their API
+// error now points directly at gemini-3.6-flash as the replacement.
+const GEMINI_MODELS = ["gemini-3.6-flash", "gemini-2.5-flash"];
 
 export const VISION_PROMPT = `You are a Vietnamese-to-English legal document translator for consular purposes.
 
